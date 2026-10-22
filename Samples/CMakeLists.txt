@@ -1,0 +1,30 @@
+add_library(lumora_sample_host STATIC Host/SampleHost.cpp)
+target_include_directories(lumora_sample_host PUBLIC Host)
+target_link_libraries(lumora_sample_host PUBLIC lumora::lumora lumora::text)
+lumora_defaults(lumora_sample_host)
+
+# Windowed path when the renderer and shaders are available; headless otherwise.
+if (TARGET lumora_renderer AND TARGET lumora_shaders_embedded)
+    target_link_libraries(lumora_sample_host PRIVATE lumora::renderer lumora::platform lumora::log lumora_shaders_embedded)
+    target_compile_definitions(lumora_sample_host PRIVATE LUMORA_SAMPLE_GPU=1)
+    add_dependencies(lumora_sample_host lumora_shaders_embedded)
+else ()
+    target_compile_definitions(lumora_sample_host PRIVATE LUMORA_SAMPLE_GPU=0)
+endif ()
+
+# Each sample: Samples/<Name>/CMakeLists.txt calling lumora_add_sample(<Name> <sources...>).
+function(lumora_add_sample name)
+    add_executable(${name} ${ARGN})
+    target_link_libraries(${name} PRIVATE lumora_sample_host)
+    lumora_defaults(${name})
+    if (LUMORA_BUILD_TESTS)
+        add_test(NAME ${name}.smoke COMMAND ${name} --headless-frames 3)
+    endif ()
+endfunction()
+
+file(GLOB _samples LIST_DIRECTORIES true "${CMAKE_CURRENT_LIST_DIR}/*")
+foreach (_dir ${_samples})
+    if (IS_DIRECTORY ${_dir} AND EXISTS "${_dir}/CMakeLists.txt")
+        add_subdirectory(${_dir})
+    endif ()
+endforeach ()

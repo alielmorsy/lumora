@@ -1,0 +1,11 @@
+lumora_add_sample(Pulse
+    main.cpp
+    Feed.cpp
+    Header.cpp
+    Cards.cpp
+    Charts.cpp
+    Gauges.cpp
+    EventLog.cpp
+    Particles.cpp
+    Stylesheet.cpp
+)

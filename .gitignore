@@ -1,0 +1,25 @@
+# Build output
+/build*/
+/cmake-build-*/
+/out/
+*.obj
+*.pdb
+*.log
+
+# IDE and agent state
+/.idea/
+/.vs/
+/.ltt.json
+
+# Fetched third party (re-fetched by cmake/FetchThirdParty.cmake)
+/ThirdParty/freetype/
+/ThirdParty/harfbuzz/
+/ThirdParty/libtess2/
+/ThirdParty/Masharif/
+/ThirdParty/SheenBidi/
+/ThirdParty/unibreak/
+/ThirdParty/spdlog/
+/ThirdParty/googletest/
+/Lumora/ThirdParty/
+/Core/Log/ThirdParty/
+/_engine_ref/RHI/Source/Backends/Vulkan/ThirdParty/

@@ -1,0 +1,43 @@
+cmake_minimum_required(VERSION 3.28)
+cmake_policy(SET CMP0091 NEW)
+project(Lumora VERSION 0.1.0 LANGUAGES C CXX)
+
+set(LUMORA_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
+
+option(LUMORA_BUILD_TESTS "Build the Lumora tests" ${PROJECT_IS_TOP_LEVEL})
+option(LUMORA_BUILD_SAMPLES "Build the Lumora samples" ${PROJECT_IS_TOP_LEVEL})
+
+if (PROJECT_IS_TOP_LEVEL)
+    if (MSVC)
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    endif ()
+    set(CMAKE_CXX_STANDARD 20)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    set(CMAKE_CXX_EXTENSIONS OFF)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+    if (LUMORA_BUILD_TESTS)
+        enable_testing()
+    endif ()
+endif ()
+
+# C++20 plus warning flags.
+function(lumora_defaults target)
+    target_compile_features(${target} PUBLIC cxx_std_20)
+    if (MSVC)
+        target_compile_options(${target} PRIVATE /W4 /permissive-)
+    else ()
+        target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+    endif ()
+endfunction()
+
+add_subdirectory(Core/Base)
+add_subdirectory(Core/Log)
+add_subdirectory(Core/Platform)
+if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/Core/RHI/CMakeLists.txt")
+    add_subdirectory(Core/RHI)
+endif ()
+add_subdirectory(Lumora)
+
+if (LUMORA_BUILD_SAMPLES AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/Samples/CMakeLists.txt")
+    add_subdirectory(Samples)
+endif ()

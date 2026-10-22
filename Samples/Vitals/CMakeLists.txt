@@ -1,0 +1,11 @@
+lumora_add_sample(Vitals
+    main.cpp
+    Model.cpp
+    Stylesheet.cpp
+    Icons.cpp
+    Components.cpp
+    TodayScreen.cpp
+    ActivityScreen.cpp
+    SleepScreen.cpp
+    ProfileScreen.cpp
+)

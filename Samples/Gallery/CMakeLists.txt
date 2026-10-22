@@ -1,0 +1,10 @@
+lumora_add_sample(Gallery
+    main.cpp
+    Common.cpp
+    ButtonsSection.cpp
+    InputsSection.cpp
+    ListsSection.cpp
+    LayoutSection.cpp
+    ThemingSection.cpp
+    Stylesheet.cpp
+)

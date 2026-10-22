@@ -1,0 +1,10 @@
+lumora_add_sample(NodeStudio
+    main.cpp
+    GraphSetup.cpp
+    PaletteView.cpp
+    InspectorView.cpp
+    StatusBar.cpp
+    MenuBarView.cpp
+    GraphCanvasView.cpp
+    Stylesheet.cpp
+)
