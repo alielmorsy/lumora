@@ -41,7 +41,7 @@ namespace lumora::style
         arena.Resolve(id).MarkDirty(Dirty::All);
     }
 
-    void ApplyText(NodeArena& arena, NodeId id, const ComputedStyle& cs, const TextCfg& cfg)
+    void ApplyText(NodeArena& arena, NodeId id, const ComputedStyle& cs, const TextStyleCfg& cfg)
     {
         LiveNode& node = arena.Resolve(id);
         LayoutStyle& ls = node.style;

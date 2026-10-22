@@ -63,8 +63,10 @@ namespace lumora
                 {
                     // Sole writer: the resolver owns size/color/font/flow and layout.
                     BindInteractProps<TextPayload>(ctx, id, data.cfg.on, &TextPayload::on);
-                    style::BindClass(ctx, id, data.cfg,
-                        [](NodeArena& a, NodeId n, const style::ComputedStyle& cs, const TextCfg& c)
+                    const TextCfg& c = data.cfg;
+                    style::BindClass(ctx, id,
+                        style::TextStyleCfg{c.size, c.color, c.font, c.flow, c.layout, c.className, {c.on.disabled}},
+                        [](NodeArena& a, NodeId n, const style::ComputedStyle& cs, const style::TextStyleCfg& c)
                         {
                             style::ApplyText(a, n, cs, c);
                         });

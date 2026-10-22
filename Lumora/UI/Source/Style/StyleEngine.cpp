@@ -73,7 +73,7 @@ namespace lumora::style
         {
             if (CssNodeState* st = TryNodeState(cursor); st != nullptr && st->participates)
             {
-                st->inheritEpoch(); // tracked: subscribe the caller to that ancestor's inherited output
+                (void)st->inheritEpoch.Read(); // tracked: subscribe the caller to that ancestor's inherited output
                 return &st->inheritedOut;
             }
             cursor = arena.Resolve(cursor).parent;
@@ -85,16 +85,13 @@ namespace lumora::style
 
     CssNodeState& StyleEngine::NodeState(NodeId id)
     {
-        auto it = m_nodes.find(id.value);
-        if (it == m_nodes.end())
-            it = m_nodes.emplace(id.value, std::make_unique<CssNodeState>()).first;
-        return *it->second;
+        return m_nodes.try_emplace(id.value).first->second;
     }
 
     CssNodeState* StyleEngine::TryNodeState(NodeId id) noexcept
     {
         auto it = m_nodes.find(id.value);
-        return it == m_nodes.end() ? nullptr : it->second.get();
+        return it == m_nodes.end() ? nullptr : &it->second;
     }
 
     void StyleEngine::ForgetNode(NodeId id)
@@ -121,7 +118,11 @@ namespace lumora::style
 
     const KeyframesDef* StyleEngine::KeyframesFor(CssNodeState& state)
     {
-        AnimationRuntime& anim = state.anim;
+        if (!state.motion)
+        {
+            return nullptr;
+        }
+        AnimationRuntime& anim = state.motion->anim;
         if (!anim.spec.enabled)
         {
             return nullptr;
@@ -155,9 +156,9 @@ namespace lumora::style
                 ++i;
                 continue;
             }
-            if (state)
+            if (state && state->motion)
             {
-                state->transitions.driverRegistered = false; // re-enrollable by the next resolve
+                state->motion->transitions.driverRegistered = false; // re-enrollable by the next resolve
             }
             m_animating[i] = m_animating.back();
             m_animating.pop_back();
@@ -169,15 +170,9 @@ namespace lumora::style
         CssNodeState* st = TryNodeState(id);
         if (!st) return; // unstyled node: no rule can test its pseudo-state
         if (m_counters) ++m_counters->pseudoWrites;
-        switch (p)
-        {
-        case Pseudo::Hover: st->pseudo.hover = on; break;
-        case Pseudo::Active: st->pseudo.active = on; break;
-        case Pseudo::Focus: st->pseudo.focus = on; break;
-        case Pseudo::Disabled: st->pseudo.disabled = on; break;
-        case Pseudo::Checked: st->pseudo.checked = on; break;
-        case Pseudo::DropActive: st->pseudo.dropActive = on; break;
-        }
+        const auto bit = static_cast<std::uint8_t>(p);
+        const std::uint8_t mask = st->pseudo.Peek();
+        st->pseudo.Write(static_cast<std::uint8_t>(on ? mask | bit : mask & ~bit));
     }
 
     MatchOps StyleEngine::MakeOps(NodeArena& arena)
@@ -187,23 +182,16 @@ namespace lumora::style
         MatchOps ops;
         ops.parent = [a, self](NodeHandle h) -> NodeHandle {
             const NodeId p = a->Resolve(NodeId{h}).parent;
-            if (p.Valid()) self->NodeState(p).classEpoch(); // subscribe to ancestor class changes
+            if (p.Valid()) (void)self->NodeState(p).classEpoch.Read(); // subscribe to ancestor class changes
             return p.value;
         };
         ops.classes = [self](NodeHandle h) -> const std::vector<StringId>& {
             return self->NodeState(NodeId{h}).classes;
         };
         ops.pseudo = [self](NodeHandle h) -> PseudoMask {
-            const CssNodeState* st = self->TryNodeState(NodeId{h});
+            CssNodeState* st = self->TryNodeState(NodeId{h});
             if (!st) return 0;
-            PseudoMask m = 0;
-            if (st->pseudo.hover()) m |= static_cast<uint8_t>(Pseudo::Hover);
-            if (st->pseudo.active()) m |= static_cast<uint8_t>(Pseudo::Active);
-            if (st->pseudo.focus()) m |= static_cast<uint8_t>(Pseudo::Focus);
-            if (st->pseudo.disabled()) m |= static_cast<uint8_t>(Pseudo::Disabled);
-            if (st->pseudo.checked()) m |= static_cast<uint8_t>(Pseudo::Checked);
-            if (st->pseudo.dropActive()) m |= static_cast<uint8_t>(Pseudo::DropActive);
-            return m;
+            return st->pseudo.Read();
         };
         ops.isRoot = [a](NodeHandle h) -> bool { return !a->Resolve(NodeId{h}).parent.Valid(); };
         return ops;

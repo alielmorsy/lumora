@@ -108,7 +108,7 @@ namespace lumora::style
         Signal<std::uint64_t> m_mediaState{0ull};
         float m_rootFontSize = 16.f;
         VarMap m_rootVars;
-        std::unordered_map<std::uint32_t, std::unique_ptr<CssNodeState>> m_nodes;
+        std::unordered_map<std::uint32_t, CssNodeState> m_nodes; ///< node-based, so references survive rehash
         std::vector<AnimatedNode> m_animating;
         FrameCounters* m_counters = nullptr;
     };

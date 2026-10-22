@@ -20,6 +20,22 @@ namespace lumora
 {
     namespace
     {
+        /// The slice of BoxCfg the style resolver re-applies on every resolve. Its effect holds this for the node's lifetime, so
+        /// handlers, paint offset and content scale (bound once onto the payload) stay out of it.
+        struct BoxStyleCfg
+        {
+            LayoutProps layout;
+            StyleProps style;
+            ViewProps view;
+            TransformProps transform;
+            PositionProps position;
+            Reactive<std::string> className;
+            struct
+            {
+                Reactive<bool> disabled;
+            } on;
+        };
+
         /// Box/Row/Column/Stack share one behaviour and config; they differ only in the flex axis (from the node kind).
         class ContainerWidget final : public TypedWidget<BoxCfg>
         {
@@ -51,8 +67,10 @@ namespace lumora
                     BindInteractProps<ContainerPayload>(ctx, id, cfg.on, &ContainerPayload::on);
                     const FlexAxis base = ctx.arena.Resolve(id).style.axis;
                     style::StyleEngine* eng = ctx.style;
-                    style::BindClass(ctx, id, cfg,
-                        [base, eng](NodeArena& a, NodeId n, const style::ComputedStyle& cs, const BoxCfg& c)
+                    style::BindClass(ctx, id,
+                        BoxStyleCfg{cfg.layout, cfg.style, cfg.view, cfg.transform, cfg.position, cfg.className,
+                                    {cfg.on.disabled}},
+                        [base, eng](NodeArena& a, NodeId n, const style::ComputedStyle& cs, const BoxStyleCfg& c)
                         {
                             style::ApplyBoxLike<ContainerPayload>(a, n, cs, c, &ContainerPayload::style,
                                                                   &ContainerPayload::view, &ContainerPayload::transform,

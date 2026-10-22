@@ -88,6 +88,30 @@ TEST(StyleTransitionTests, FillTransitionInterpolates)
     EXPECT_EQ(h.Style(root).fill, Color(255, 255, 255));
 }
 
+// The transition is declared only by the toggled-in class, so the node had no transition state before the toggle: the run must
+// still start from what was on screen, not snap.
+TEST(StyleTransitionTests, TransitionAddedByToggleAnimatesFromThePreviousValue)
+{
+    SetReducedMotion(false);
+    StyleHarness h;
+    Owner owner;
+    auto cls = Signal<std::string>("card");
+    h.engine.LoadSource(".card { background-color: #000000; } "
+                        ".card.on { background-color: #ffffff; transition: background-color 1s linear; }");
+    const NodeId root = h.Mount(Box({.className = cls}), owner);
+    EXPECT_EQ(h.Style(root).fill, Color(0, 0, 0));
+
+    cls = std::string("card on");
+    EXPECT_EQ(h.Style(root).fill, Color(0, 0, 0));
+    h.Frames(30);
+    const Color mid = h.Style(root).fill;
+    EXPECT_GT(mid.r, 100);
+    EXPECT_LT(mid.r, 160);
+
+    h.Frames(40);
+    EXPECT_EQ(h.Style(root).fill, Color(255, 255, 255));
+}
+
 TEST(StyleTransitionTests, RetargetMidFlight)
 {
     SetReducedMotion(false);

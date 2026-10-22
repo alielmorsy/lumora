@@ -48,7 +48,7 @@ namespace lumora::style
             if (parsed != st.classes)
             {
                 st.classes = std::move(parsed);
-                st.classEpoch = st.classEpoch.Peek() + 1; // notify descendants (combinator reactivity)
+                st.classEpoch.Write(st.classEpoch.Peek() + 1); // notify descendants (combinator reactivity)
             }
 
             if (FrameCounters* counters = eng->Counters())
@@ -69,25 +69,39 @@ namespace lumora::style
             InheritedStyle out = ApplyInheritance(cs, parentInh, vars);
 
             apply(*arena, id, cs, cfg);
+            st.resolved = true;
             st.current = std::move(cs);
 
             // Publish inherited output for descendants; equality-gated so we only wake them on a change.
             if (!(out == st.inheritedOut))
             {
                 st.inheritedOut = std::move(out);
-                st.inheritEpoch = st.inheritEpoch.Peek() + 1;
+                st.inheritEpoch.Write(st.inheritEpoch.Peek() + 1);
             }
         });
 
         // Mirror the node's disabled prop into its :disabled pseudo signal (separate effect: the resolver reads, this writes).
         // Cfgs with an interaction group hold it there, leaf controls at top level, so match on `.Get()` not the name.
+        // A static prop is written once instead: an effect per node that can never re-run is pure overhead.
+        const auto mirrorDisabled = [eng, id](const auto& d)
+        {
+            if (d.IsStatic())
+            {
+                if (d.Get())
+                {
+                    eng->SetPseudo(id, Pseudo::Disabled, true);
+                }
+                return;
+            }
+            Effect([eng, id, d] { eng->SetPseudo(id, Pseudo::Disabled, d.Get()); });
+        };
         if constexpr (requires { cfg.on.disabled.Get(); })
         {
-            Effect([eng, id, d = cfg.on.disabled] { eng->SetPseudo(id, Pseudo::Disabled, d.Get()); });
+            mirrorDisabled(cfg.on.disabled);
         }
         else if constexpr (requires { cfg.disabled.Get(); })
         {
-            Effect([eng, id, d = cfg.disabled] { eng->SetPseudo(id, Pseudo::Disabled, d.Get()); });
+            mirrorDisabled(cfg.disabled);
         }
 
         OnCleanup([eng, id] { eng->ForgetNode(id); });
@@ -106,6 +120,10 @@ namespace lumora::style
         StyleState& ss = pl.*stylePtr;
         ViewState& vs = pl.*viewPtr;
         TransformState& ts = pl.*transPtr;
+        // What was on screen before this resolve: seeds a Motion created now, so a transition a class toggle introduces still
+        // animates from the old value.
+        const StyleState prevStyle = ss;
+        const TransformState prevTransform = ts;
 
         ls.width = cs.Get("width"_sid) ? ToSizeHint(*cs.Get("width"_sid), Wrap) : cfg.layout.width.Get();
         ls.height = cs.Get("height"_sid) ? ToSizeHint(*cs.Get("height"_sid), Wrap) : cfg.layout.height.Get();
@@ -314,9 +332,24 @@ namespace lumora::style
 
         // Transitions/@keyframes: parse the specs; StyleEngine's single driver advances runs. The transition intercept starts a
         // run from the displayed value when a transitioned target changes.
-        ParseTransitions(cs.Get("transition"_sid) ? *cs.Get("transition"_sid) : CssValue{}, css.transitions);
-        InterceptBox(css.transitions, ss, ts);
-        ParseAnimation(cs.Get("animation"_sid) ? *cs.Get("animation"_sid) : CssValue{}, css.anim);
+        const CssValue* transition = cs.Get("transition"_sid);
+        const CssValue* animation = cs.Get("animation"_sid);
+        if (!css.motion && (transition || animation))
+        {
+            css.motion = std::make_unique<CssNodeState::Motion>();
+            if (css.resolved)
+            {
+                StyleState seedStyle = prevStyle;
+                TransformState seedTransform = prevTransform;
+                InterceptBox(css.motion->transitions, seedStyle, seedTransform);
+            }
+        }
+        if (css.motion)
+        {
+            ParseTransitions(transition ? *transition : CssValue{}, css.motion->transitions);
+            InterceptBox(css.motion->transitions, ss, ts);
+            ParseAnimation(animation ? *animation : CssValue{}, css.motion->anim);
+        }
 
         node.MarkDirty(Dirty::All);
     }
@@ -332,11 +365,15 @@ namespace lumora::style
         {
             return false;
         }
-        Payload& payload = arena.PayloadOf<Payload>(id);
-        AdvanceResult result = AdvanceBox(state.transitions, payload.*StylePtr, payload.*TransPtr, dt);
-        if (state.anim.spec.enabled && keyframes)
+        if (!state.motion)
         {
-            result |= AdvanceAnimation(state.anim, *keyframes, payload.*StylePtr, payload.*TransPtr, dt);
+            return false;
+        }
+        Payload& payload = arena.PayloadOf<Payload>(id);
+        AdvanceResult result = AdvanceBox(state.motion->transitions, payload.*StylePtr, payload.*TransPtr, dt);
+        if (state.motion->anim.spec.enabled && keyframes)
+        {
+            result |= AdvanceAnimation(state.motion->anim, *keyframes, payload.*StylePtr, payload.*TransPtr, dt);
         }
         if (result.wrote)
         {
@@ -351,23 +388,39 @@ namespace lumora::style
     void EnrolBoxAnimator(StyleEngine& engine, NodeArena& arena, NodeId id)
     {
         CssNodeState& state = engine.NodeState(id);
-        if (state.transitions.driverRegistered)
+        if (!state.motion || state.motion->transitions.driverRegistered)
         {
-            return; // already being driven
+            return; // nothing declared, or already being driven
         }
-        if (!AnyActive(state.transitions) && !state.anim.spec.enabled)
+        if (!AnyActive(state.motion->transitions) && !state.motion->anim.spec.enabled)
         {
             return; // nothing to advance
         }
-        state.transitions.driverRegistered = true;
+        state.motion->transitions.driverRegistered = true;
         engine.Enrol(id, arena.GenerationOf(id), &AdvanceBoxNode<Payload, StylePtr, TransPtr>);
     }
 
     /// Layout-header size/spacing from CSS-or-inline, shared by the leaf-widget resolvers (no child layout to align).
     void ApplyLayout(NodeArena& arena, NodeId id, const ComputedStyle& cs, const LayoutProps& layout);
 
+    /// The slice of TextCfg the resolver re-applies; its effect holds this for the node's lifetime, so handlers and the selection
+    /// handle (bound once onto the payload) stay out of it.
+    struct TextStyleCfg
+    {
+        Reactive<float> size;
+        Reactive<Color> color;
+        FontProps font;
+        TextFlowProps flow;
+        LayoutProps layout;
+        Reactive<std::string> className;
+        struct
+        {
+            Reactive<bool> disabled;
+        } on;
+    };
+
     /// Text has no StyleState: writes the TextPayload (colour/font/flow) + layout header.
-    void ApplyText(NodeArena& arena, NodeId id, const ComputedStyle& cs, const TextCfg& cfg);
+    void ApplyText(NodeArena& arena, NodeId id, const ComputedStyle& cs, const TextStyleCfg& cfg);
 
     /// Button: writes its payload fields (fill/color/radius) + layout.
     void ApplyButton(NodeArena& arena, NodeId id, const ComputedStyle& cs, const ButtonCfg& cfg);
