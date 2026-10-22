@@ -43,26 +43,6 @@ On Windows, `scripts\build.cmd` and `scripts\release.cmd` set up the MSVC enviro
 
 ## Benchmarks
 
-`LumoraBench` under `Benchmarks/` measures frame workloads against a null canvas (Tick, Layout, Paint) and reports allocation statistics.
-
-CLI flags:
-
-- `--scale N`: Scene scale factor (default: 2000).
-- `--frames N`: Number of measured frames (default: 200).
-- `--warmup N`: Number of warm-up frames to discard before recording (default: 40).
-- `--scene substr`: Filter benchmark scenes by substring match.
-- `--font path`: Path to a TrueType font file.
-- `--csv`: Emit machine-readable CSV output.
-- `--alloc-sites`: (Windows) Report heap allocations still held after warm-up, grouped by call site.
-
-Reports provide:
-- Frame times per phase (Tick, Layout, Paint, and Total min/median/p95).
-- Allocation rates per frame (count and KiB per frame).
-- Heap statistics per node (mount duration, blueprint memory, live memory per node, peak mount memory, and steady-state heap growth).
-
-Median CPU time to produce one frame (tick + layout + paint recording) at the default scale of 2000 nodes on a 1920x1080
-surface, RelWithDebInfo MSVC build on an AMD Ryzen 7 5700X3D. GPU submission is not included (null canvas).
-
 | Scene | What changes each frame | Frame time (ms) | Heap per node |
 |---|---|---|---|
 | static-idle | nothing | 0.018 | 2.6 KB |
@@ -80,21 +60,6 @@ Executable samples under `Samples/`:
 - **NodeStudio**: Interactive visual node graph editor with draggable nodes, pin connections, inspector panel, palette, and canvas navigation.
 - **Pulse**: Real-time observability dashboard displaying streaming traffic charts, animated gauges, heatmaps, live metric grids, and event feeds.
 - **Vitals**: Mobile health and wellness interface featuring tab navigation (Today, Activity, Sleep, Profile), bottom navigation, cards, bottom sheets, FAB, and accent color themes.
-
-### Sample Flags
-
-All samples accept standard flags via `Samples/Host`:
-
-- `--validation`: Enables Vulkan validation layers and debug labels.
-- `--exit-after N`: Runs the interactive window for `N` frames and exits.
-- `--headless-frames N`: Executes `N` frames in headless mode without creating a GPU device or window.
-
-`Vitals` also supports startup flags for scripted testing and screenshots:
-
-- `--tab N`: Initial active tab index (0 to 3).
-- `--dark`: Start with dark theme enabled.
-- `--accent N`: Accent color palette index (0 to 3).
-- `--sheet`: Start with the bottom sheet modal opened.
 
 ## Example
 
