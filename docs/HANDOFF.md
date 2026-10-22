@@ -16,21 +16,26 @@ zero errors/warnings. A Release build produces a single shippable exe (static CR
 
 ```
 CMakeLists.txt            top level; works as top-level or add_subdirectory (LUMORA_* options)
-build.cmd / release.cmd   vcvars64 + Ninja; LUMORA_BUILD_DIR picks the build folder
-cmake/                    FetchThirdParty, AddThirdParty, EmbedFiles (SPIR-V -> C++ arrays)
-Core/Base                 lumora::base     Api.h, Ref.h, StringId.h, EventBus.h (header only)
-Core/Log                  lumora::log      spdlog-backed logger, LOG_* macros, LUMORA_LOG_CATEGORY
-Core/Platform             lumora::platform Win32 window/input/clipboard/dialogs + OS (folded OSCore)
-Core/RHI                  lumora::rhi      slim Vulkan RHI (see below) + gtest suite
-Lumora/                   lumora::lumora   UI library (reactive, widgets, style, layout, graph, svg)
+CMakePresets.json         debug / release presets, output in build/<preset>
+scripts/                  build.cmd / release.cmd: vcvars64 + preset; LUMORA_BUILD_DIR overrides the folder
+cmake/                    LumoraTarget (lumora_defaults), FetchThirdParty, AddThirdParty, EmbedFiles
+cmake/deps/               one file per third-party library (fetch + target)
+Lumora/Core/Base          lumora::base     Api.h, Ref.h, StringId.h, EventBus.h (header only)
+Lumora/Core/Log           lumora::log      spdlog-backed logger, LOG_* macros, LUMORA_LOG_CATEGORY
+Lumora/Core/Platform      lumora::platform Win32 window/input/clipboard/dialogs + OS (folded OSCore)
+Lumora/Core/RHI           lumora::rhi      slim Vulkan RHI (see below)
+Lumora/UI                 lumora::lumora   UI library (reactive, widgets, style, layout, graph, svg)
 Lumora/Text               lumora::text     FontSystem (freetype, harfbuzz, sheenbidi, unibreak)
 Lumora/Renderer           lumora::renderer RHI painter, pipelines, HLSL shaders, embedded SPIR-V
-Lumora/Tests              gtest targets (see Tests)
+Tests/{Core/Platform,Core/RHI,UI,Renderer}  gtest targets (see Tests)
+Benchmarks/               LumoraBench
 Samples/Host              RunSample(desc, argc, argv): window + RHI + Lumora loop, or headless
 Samples/{Gallery,NodeStudio,Pulse,Vitals}
-ThirdParty/               vma, stb (vendored), googletest (FetchContent zip)
-_engine_ref/              read-only copy of engine RHI + DefineTarget.cmake, reference only, not built
+ThirdParty/               all third-party sources: vma, stb (vendored), the rest fetched (git-ignored)
+docs/                     this file, CSS.md, TextRendering.md, RectRendering.md, specs
 ```
+
+Public include paths are unchanged (`<lumora/...>`).
 
 Namespaces: `lumora`, `lumora::rhi`, `lumora::platform`, `lumora::os`, `lumora::log`, `lumora::nodegraph`.
 Macros: `LUMORA_*`. Graph node ids are `nodegraph::GraphNodeId` (renamed to avoid clashing with `lumora::NodeId`).
@@ -38,10 +43,10 @@ Macros: `LUMORA_*`. Graph node ids are `nodegraph::GraphNodeId` (renamed to avoi
 ## Build and run
 
 ```
-build.cmd                         Debug into build\ (set LUMORA_BUILD_DIR to change)
-build.cmd --target Vitals         one target
-release.cmd --target Vitals       Release into build-release\
-ctest --test-dir build -j 8       run from an MSVC env; set LUMORA_NO_DIALOGS=1 for unattended runs
+scripts\build.cmd                     Debug into build\debug (set LUMORA_BUILD_DIR to change)
+scripts\build.cmd --target Vitals     one target
+scripts\release.cmd --target Vitals   Release into build\release
+ctest --preset debug                  run from an MSVC env; the preset sets LUMORA_NO_DIALOGS=1
 ```
 
 Sample flags: `--validation` (Vulkan validation), `--exit-after N` (quit after N frames),
@@ -121,7 +126,7 @@ providing fonts to text selection, scroll content not overflowing); each was upd
 1. **In progress when this was written** (agy worker `nodestudio`, task #243): Gallery Switch / Checkbox /
    dark-mode switch rendering, stylable colors for ComboBox, Breadcrumb, Badge, Splitter, Checkbox, and the
    VirtualList doc comment. Review its result: run Gallery light + dark, `ctest`.
-2. **Android** (designed, not started): `Core/Platform/Source/Android` with GameActivity + GameTextInput
+2. **Android** (designed, not started): `Lumora/Core/Platform/Source/Android` with GameActivity + GameTextInput
    (full IME), touch -> pointer events, lifecycle and surface recreation, AAssetManager loader, bundled fonts,
    Gradle sample. Library work: drag-to-scroll with slop + fling, long-press menus, pinch on Graph, IME
    composition events. NDK 28.2 is at `D:\Android\SDK`. Both RHI fallbacks need a real Android 11 device run.
@@ -136,12 +141,13 @@ providing fonts to text selection, scroll content not overflowing); each was upd
 
 ## Housekeeping (not cleaned up, by design: nothing was deleted without the user asking)
 
-- Worker build folders: `build-gtest`, `build-nodestudio`, `build-rhi-cmd`, `build-rhi-res`, `build-vitals`.
-- Strays in the repo root from worker runs: `Gallery.log`, `NumberField.obj`, `vc140.pdb`,
-  `cmake-build-relwithdebinfo/`.
+- The repo is now under git (`main`). `_engine_ref/` was removed in the restructure.
+- Pre-restructure build folders are stale (absolute paths): `build/` (old root cache), `build-gtest`,
+  `build-nodestudio`, `build-release`, `build-rhi-cmd`, `build-rhi-res`, `build-vitals`,
+  `cmake-build-relwithdebinfo/`, plus strays `Gallery.log`, `NumberField.obj`, `vc140.pdb`. All git-ignored.
 - Off-repo build folders left by the Vitals agent: `E:\lumora-build-vitals` and one under the session scratchpad.
-- `_engine_ref/` can go once nobody needs the engine RHI for reference.
 - agy workers still registered in let-them-talk workspace `lumora`: rhi-res, rhi-cmd, nodestudio, gtest.
+  Their `owns` paths predate the restructure (`Core/...` is now `Lumora/Core/...`, tests are under `Tests/`).
 
 ## Conventions the user asked for
 
