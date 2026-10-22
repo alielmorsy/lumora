@@ -49,7 +49,7 @@ function(lumora_fetch_thirdparty NAME)
     endif ()
 
     if (NOT _fetched)
-        if (NOT Git_FOUND)
+        if (NOT GIT_EXECUTABLE) # cached, so visible from every directory scope; Git_FOUND is not
             message(FATAL_ERROR "lumora_fetch_thirdparty(${NAME}): git not found")
         endif ()
         set(_sub "")

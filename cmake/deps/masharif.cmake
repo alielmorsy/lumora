@@ -5,7 +5,7 @@ include(${LUMORA_ROOT_DIR}/cmake/FetchThirdParty.cmake)
 
 lumora_fetch_thirdparty(Masharif
         REPO alielmorsy/Masharif
-        TAG v1.1
+        TAG v1.2
         CMAKE
         SUBDIR masharifcore)
 
