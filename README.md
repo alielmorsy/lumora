@@ -41,23 +41,7 @@ On Windows, `scripts\build.cmd` and `scripts\release.cmd` set up the MSVC enviro
 - `linux-profile`: RelWithDebInfo build with frame pointers (`-fno-omit-frame-pointer`) for profiling.
 - `linux-asan`: RelWithDebInfo build configured with AddressSanitizer and UndefinedBehaviorSanitizer (`-fsanitize=address,undefined`).
 
-## Testing & Benchmarks
-
-### Test Suites
-
-Unit tests are written with GoogleTest and located under `Tests/`. Run all tests with CTest:
-
-```sh
-ctest --preset debug
-```
-
-Test presets define the environment variable `LUMORA_NO_DIALOGS=1`, which prevents fatal error message boxes from blocking test runs on Windows.
-
-### Smoke Tests
-
-Each sample target registers a smoke test named `<Name>.smoke` with CTest. These smoke tests run the sample in headless mode for 3 frames (`--headless-frames 3`) to verify initialization, layout, and teardown without opening a window.
-
-### Benchmarks
+## Benchmarks
 
 `LumoraBench` under `Benchmarks/` measures frame workloads against a null canvas (Tick, Layout, Paint) and reports allocation statistics.
 
@@ -75,6 +59,18 @@ Reports provide:
 - Frame times per phase (Tick, Layout, Paint, and Total min/median/p95).
 - Allocation rates per frame (count and KiB per frame).
 - Heap statistics per node (mount duration, blueprint memory, live memory per node, peak mount memory, and steady-state heap growth).
+
+Median CPU time to produce one frame (tick + layout + paint recording) at the default scale of 2000 nodes on a 1920x1080
+surface, RelWithDebInfo MSVC build on an AMD Ryzen 7 5700X3D. GPU submission is not included (null canvas).
+
+| Scene | What changes each frame | Frame time (ms) | Heap per node |
+|---|---|---|---|
+| static-idle | nothing | 0.018 | 2.6 KB |
+| one-leaf-write | one text leaf in a 2000-node tree | 0.75 | 2.7 KB |
+| repaint-one-leaf | one fill colour | 0.15 | 2.7 KB |
+| hover-transitions | pointer moves across CSS `:hover` transitions | 1.15 | 3.9 KB |
+| virtual-list | scrolling a 20000-row list | 0.05 | 1.6 KB |
+| text-panel | nothing (200 rows of text labels, real font) | 0.006 | 2.9 KB |
 
 ## Samples
 
