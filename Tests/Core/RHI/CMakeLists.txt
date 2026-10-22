@@ -1,5 +1,3 @@
-include(${PROJECT_SOURCE_DIR}/ThirdParty/add_googletest.cmake)
-
 find_program(LUMORA_DXC NAMES dxc HINTS "$ENV{VULKAN_SDK}/Bin")
 if (NOT LUMORA_DXC)
     message(FATAL_ERROR "dxc not found in VULKAN_SDK: cannot compile test shaders")
@@ -40,7 +38,7 @@ add_custom_target(rhi_test_shaders DEPENDS "${_vert_spv}" "${_frag_spv}" "${_att
 add_executable(lumora_rhi_tests RhiTests.cpp)
 add_dependencies(lumora_rhi_tests rhi_test_shaders)
 lumora_defaults(lumora_rhi_tests)
-target_include_directories(lumora_rhi_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../Source/Vulkan)
+target_include_directories(lumora_rhi_tests PRIVATE ${LUMORA_ROOT_DIR}/Lumora/Core/RHI/Source/Vulkan)
 target_compile_definitions(lumora_rhi_tests PRIVATE TEST_SPIRV_DIR="${_spirv_dir}")
 target_link_libraries(lumora_rhi_tests PRIVATE lumora::rhi lumora::log GTest::gtest GTest::gtest_main)
 

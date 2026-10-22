@@ -1,3 +1,6 @@
+# RHI painter: batches Lumora display lists into Vulkan draws.
+include(${LUMORA_ROOT_DIR}/cmake/deps/stb.cmake)
+
 add_library(lumora_renderer STATIC
     Source/Lumora.cpp
     Source/RHIPainter.cpp

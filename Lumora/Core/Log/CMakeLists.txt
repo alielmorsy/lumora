@@ -1,5 +1,5 @@
 if (NOT TARGET spdlog AND NOT TARGET spdlog::spdlog)
-    include(add_spdlog.cmake)
+    include(${LUMORA_ROOT_DIR}/cmake/deps/spdlog.cmake)
 endif ()
 
 add_library(lumora_log STATIC Source/Log.cpp Source/Spdlog.cpp)

@@ -34,7 +34,3 @@ if (WIN32)
     set_source_files_properties(${_windows} PROPERTIES COMPILE_DEFINITIONS "UNICODE;_UNICODE")
     target_link_libraries(lumora_platform PRIVATE user32 gdi32 psapi ole32 shell32 advapi32 XInput dbghelp)
 endif ()
-
-if (LUMORA_BUILD_TESTS)
-    add_subdirectory(Tests)
-endif ()

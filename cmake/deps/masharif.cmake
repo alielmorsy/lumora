@@ -7,8 +7,7 @@ lumora_fetch_thirdparty(Masharif
         REPO alielmorsy/Masharif
         TAG v1.1
         CMAKE
-        SUBDIR masharifcore
-        DEST "${CMAKE_CURRENT_LIST_DIR}/ThirdParty/Masharif")
+        SUBDIR masharifcore)
 
 # masharifcore is SHARED but exports nothing, so MSVC emits no import library. Synthesise the exports;
 # IPO must be off or the /GL objects hide the symbols from the export scan.

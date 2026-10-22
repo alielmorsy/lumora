@@ -1,5 +1,3 @@
-include(${PROJECT_SOURCE_DIR}/ThirdParty/add_googletest.cmake)
-
 add_executable(lumora_platform_tests
     WindowGeometryTests.cpp
     DirectoryWatcherTests.cpp
