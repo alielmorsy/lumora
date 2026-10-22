@@ -1,6 +1,7 @@
 #pragma once
 
 #include <lumora/Api.h>
+#include <lumora/Foundation/Fn.h>
 #include <lumora/Ref.h>
 
 #include <cstdint>
@@ -17,11 +18,7 @@ class ReactiveGraph;
 
 namespace lumora::detail {
 
-#if defined(__cpp_lib_move_only_function)
-using VoidFn = std::move_only_function<void()>;
-#else
-using VoidFn = std::function<void()>;
-#endif
+using VoidFn = MoveFn<void()>;
 
 /// Glitch-resolution state, ordered Clean < Check < Dirty: a write marks direct observers Dirty and
 /// transitive ones Check; a pull recomputes only nodes a value actually reached.

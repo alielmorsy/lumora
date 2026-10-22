@@ -106,7 +106,7 @@ namespace lumora
         // Copy the payload before Clear() resets it: onDrop may outlive this call.
         const DragPayload  payload = m_payload;
         InteractState*     on      = StateOf(arena, m_target);
-        std::function<void(const DragPayload&, PointerInfo)> drop = on ? on->onDrop : nullptr;
+        Fn<void(const DragPayload&, PointerInfo)> drop = on ? on->onDrop : nullptr;
 
         Clear(arena, state);
 

@@ -7,13 +7,8 @@
 
 namespace lumora {
 
-#if defined(__cpp_lib_move_only_function)
-using CleanupFn = std::move_only_function<void()>;
-using FrameFn   = std::move_only_function<void(float)>;
-#else
-using CleanupFn = std::function<void()>;
-using FrameFn   = std::function<void(float)>;
-#endif
+using CleanupFn = MoveFn<void()>;
+using FrameFn   = MoveFn<void(float)>;
 
 /// Run `fn` untracked: reads inside do not subscribe the enclosing effect/computed. Returns fn's result.
 template<typename Fn>

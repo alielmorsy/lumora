@@ -1,6 +1,7 @@
 #pragma once
 
 #include <lumora/Foundation/Color.h>
+#include <lumora/Foundation/Fn.h>
 #include <lumora/Foundation/Geometry.h>
 #include <lumora/Foundation/Position.h>
 #include <lumora/Foundation/Vec2.h>
@@ -204,41 +205,41 @@ namespace lumora
     /// Interaction concern, consumed by dispatch. Handlers are copied once; only `disabled` is reactive.
     struct InteractProps
     {
-        std::function<void()> onClick{};
+        Fn<void()> onClick{};
         /// The second click of a pair on this node inside the double-click window. Fires IN ADDITION to `onClick` (already run for
         /// both presses), so a node that opens on double-click still selects on the first. A third click starts a fresh pair.
-        std::function<void()> onDoubleClick{};
-        std::function<void(PointerInfo)> onPress{}, onRelease{}, onMove{};
-        std::function<void(float)> onScroll{};
-        std::function<void()> onEnter{}, onLeave{};
+        Fn<void()> onDoubleClick{};
+        Fn<void(PointerInfo)> onPress{}, onRelease{}, onMove{};
+        Fn<void(float)> onScroll{};
+        Fn<void()> onEnter{}, onLeave{};
         /// Right-click hook: build the items to pop at the cursor; an empty list opens nothing. The framework owns overlay,
         /// positioning and dismissal; items may nest via ContextMenuItem::submenu.
-        std::function<std::vector<ContextMenuItem>()> onContextMenu{};
+        Fn<std::vector<ContextMenuItem>()> onContextMenu{};
 
         /// Drag source: what this node carries. Called on the press; return nullopt for "not draggable now". Returning a payload
         /// does not consume the press; the drag arms past the movement threshold. The ghost is one app-level builder keyed on the
-        /// payload (`Lumora::SetDragPreview`), not declared here: a `std::function<Elem()>` would pull Elem.h into every widget header.
-        std::function<std::optional<DragPayload>()> onDragStart{};
+        /// payload (`Lumora::SetDragPreview`), not declared here: a `Fn<Elem()>` would pull Elem.h into every widget header.
+        Fn<std::optional<DragPayload>()> onDragStart{};
         /// Drop target: true for accepted payloads. Called per pointer move during a drag, so keep it cheap. The innermost accepting
         /// node wins; a refusing node does not block an accepting ancestor.
-        std::function<bool(const DragPayload&)> dropAccepts{};
+        Fn<bool(const DragPayload&)> dropAccepts{};
         /// The drop. `info.position` is the surface point the pointer was released at.
-        std::function<void(const DragPayload&, PointerInfo)> onDrop{};
+        Fn<void(const DragPayload&, PointerInfo)> onDrop{};
         /// Entered (true) / left (false) this target while armed. `:drop-active` is written either way; use this for more (an
         /// insertion caret, a preview).
-        std::function<void(const DragPayload&, bool)> onDragOver{};
+        Fn<void(const DragPayload&, bool)> onDragOver{};
 
         /// Keyboard focus arrived/left. `viaKeyboard` is true for Tab traversal or programmatic focus, false for a click (drives the
         /// focus ring). Needs a `focusPolicy` other than None.
-        std::function<void(bool)> onFocus{};
-        std::function<void()>     onBlur{};
+        Fn<void(bool)> onFocus{};
+        Fn<void()>     onBlur{};
         /// A key pressed while this node (or an unconsuming descendant) holds focus. Return true to consume; an unconsumed Tab runs
         /// focus traversal.
-        std::function<bool(KeyInfo)> onKeyDown{};
+        Fn<bool(KeyInfo)> onKeyDown{};
         /// Key release while focused; the other half of a held-key latch seen through `onKeyDown`. Return true to consume.
-        std::function<bool(KeyInfo)> onKeyUp{};
+        Fn<bool(KeyInfo)> onKeyUp{};
         /// Decoded text typed while focused (one grapheme per call, never a shortcut); return true to consume. The type-to-edit seam.
-        std::function<bool(std::string_view)> onTextInput{};
+        Fn<bool(std::string_view)> onTextInput{};
 
         Reactive<bool> disabled = false;
         /// Receive middle-button press/release through `onPress`/`onRelease` (`PointerInfo::button` distinguishes it). Opt-in because

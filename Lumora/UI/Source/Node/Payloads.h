@@ -1,6 +1,7 @@
 #pragma once
 
 #include <lumora/Foundation/Color.h>
+#include <lumora/Foundation/Fn.h>
 #include <lumora/Foundation/Geometry.h>
 #include <lumora/Foundation/Vec2.h>
 #include <lumora/Paint/DrawTypes.h>
@@ -72,26 +73,26 @@ namespace lumora
 
     struct InteractState
     {
-        std::function<void()> onClick;
-        std::function<void()> onDoubleClick;
-        std::function<void(PointerInfo)> onPress, onRelease, onMove;
-        std::function<void(float)> onScroll;
-        std::function<void()> onEnter, onLeave;
-        std::function<std::vector<ContextMenuItem>()> contextMenu;
+        Fn<void()> onClick;
+        Fn<void()> onDoubleClick;
+        Fn<void(PointerInfo)> onPress, onRelease, onMove;
+        Fn<void(float)> onScroll;
+        Fn<void()> onEnter, onLeave;
+        Fn<std::vector<ContextMenuItem>()> contextMenu;
 
         // Drag & drop, copied at bind. A node is a drag source iff dragStart is set and a drop target iff dropAccepts is set; both may be set.
-        std::function<std::optional<DragPayload>()>          dragStart;
-        std::function<bool(const DragPayload&)>              dropAccepts;
-        std::function<void(const DragPayload&, PointerInfo)> onDrop;
-        std::function<void(const DragPayload&, bool)>        onDragOver;
+        Fn<std::optional<DragPayload>()>          dragStart;
+        Fn<bool(const DragPayload&)>              dropAccepts;
+        Fn<void(const DragPayload&, PointerInfo)> onDrop;
+        Fn<void(const DragPayload&, bool)>        onDragOver;
 
         // Keyboard, copied at bind. onFocus/onBlur fire off the dispatcher-derived FocusGained/FocusLost; onKeyDown/onTextInput are reached
         // only while this node (or a descendant that left the key unconsumed) holds focus.
-        std::function<void(bool)>             onFocus;
-        std::function<void()>                 onBlur;
-        std::function<bool(KeyInfo)>          onKeyDown;
-        std::function<bool(KeyInfo)>          onKeyUp;
-        std::function<bool(std::string_view)> onTextInput;
+        Fn<void(bool)>             onFocus;
+        Fn<void()>                 onBlur;
+        Fn<bool(KeyInfo)>          onKeyDown;
+        Fn<bool(KeyInfo)>          onKeyUp;
+        Fn<bool(std::string_view)> onTextInput;
 
         bool disabled = false;
         bool middleButton = false; ///< opt in to middle-button press/release (see InteractProps)

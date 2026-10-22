@@ -685,7 +685,7 @@ namespace lumora
         }
 
         const InteractState* on = detail::InteractOf(arena, arena.Resolve(targetId));
-        const std::function<void(const DragPayload&, PointerInfo)> drop = on ? on->onDrop : nullptr;
+        const Fn<void(const DragPayload&, PointerInfo)> drop = on ? on->onDrop : nullptr;
         if (!drop)
         {
             return false;
