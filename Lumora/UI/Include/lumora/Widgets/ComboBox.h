@@ -45,7 +45,7 @@ namespace lumora
             .border    = {1.f, Color::Rgba(60, 63, 72, 255)},
         };
         /// CSS class list forwarded onto the trigger so its chrome can be themed from a stylesheet.
-        Reactive<std::string> className{};
+        Str                   className{};
 
         // Dropdown surface palette.
         Reactive<Color> panelFill   = Color::Rgba(30, 32, 39, 252);

@@ -1,0 +1,8 @@
+{
+  "id": "com.lumora.vitals",
+  "label": "Vitals",
+  "orientation": "portrait",
+  "entry": {
+    "native": "Vitals"
+  }
+}

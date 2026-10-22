@@ -71,7 +71,27 @@ inline int WINAPI wWinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/,
 
 #elif defined(__ANDROID__)
 
-    #error "lumora::platform entry point: Android backend not implemented yet"
+    #include "Launch.h"
+    #include <lumora/platform/android/AndroidApp.h>
+    #include <game-activity/GameActivity.h>
+    #include <game-activity/native_app_glue/android_native_app_glue.h>
+
+    extern "C" void android_main(struct android_app* app)
+    {
+        lumora::platform::android::SetApp(app);
+        if (app && app->activity)
+        {
+            lumora::platform::android::SetAssetManager(app->activity->assetManager);
+        }
+
+        lumora::platform::LaunchArgs args{0, nullptr};
+        lumora::platform::Main(args);
+
+        if (app && app->activity)
+        {
+            GameActivity_finish(app->activity);
+        }
+    }
 
 #else
 

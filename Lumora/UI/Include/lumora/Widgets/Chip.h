@@ -41,7 +41,7 @@ namespace lumora
             .border    = {1.f, Color::Rgba(64, 68, 78, 255)},
         };
         Color textColor = Color::Rgba(214, 218, 226, 255);
-        Reactive<std::string> className{};
+        Str                   className{};
     };
 
     [[nodiscard]] LUMORA_API Elem Chip(ChipCfg cfg = {});

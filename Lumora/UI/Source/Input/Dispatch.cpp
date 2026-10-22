@@ -408,8 +408,11 @@ namespace lumora
             DeliverDerived(base, s.focused, EventType::FocusLost);
             s.focused      = target;
             s.focusVisible = viaKeyboard;
+            s.focusTakesText = false; // text widgets that handle TextInput internally set it again on FocusGained
             if (const NodeId now = s.focused.Resolve(*base.arena); now.Valid())
             {
+                const InteractState* on = detail::InteractOf(*base.arena, base.arena->Resolve(now));
+                s.focusTakesText = on && on->onTextInput;
                 base.arena->Resolve(now).MarkDirty(Dirty::Repaint);
                 WritePseudo(s, now, style::Pseudo::Focus, true);
                 detail::RecordScopeFocus(*base.arena, now);

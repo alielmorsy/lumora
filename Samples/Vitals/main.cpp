@@ -59,8 +59,11 @@ private:
 
 } // namespace vitals
 
-int main(int argc, char** argv)
+int lumora::platform::Main(const lumora::platform::LaunchArgs& args)
 {
+    const int argc = args.argc;
+    char** const argv = args.argv;
+
     // Startup flags for scripted screenshots: --tab N, --dark, --accent N, --sheet.
     int  tab = 0, accent = 0;
     bool dark = false, sheet = false;

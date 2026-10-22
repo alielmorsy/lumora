@@ -4,6 +4,7 @@
 #include <lumora/Elem.h>
 #include <lumora/Foundation/Color.h>
 #include <lumora/Reactive/Reactive.h>
+#include <lumora/Reactive/Str.h>
 #include <lumora/Widgets/Props.h>
 
 #include <functional>
@@ -42,7 +43,7 @@ namespace lumora
         Reactive<Color> dimColor    = Color::Rgba(126, 132, 142, 255); ///< separators and the marker
 
         LayoutProps           layout{};
-        Reactive<std::string> className{};
+        Str                   className{};
     };
 
     [[nodiscard]] LUMORA_API Elem Breadcrumb(BreadcrumbCfg cfg);

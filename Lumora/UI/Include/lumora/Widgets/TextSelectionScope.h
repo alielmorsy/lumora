@@ -4,6 +4,7 @@
 #include <lumora/Ref.h>
 #include <lumora/Detail/Node.h>
 #include <lumora/Elem.h>
+#include <lumora/Reactive/Str.h>
 #include <lumora/Widgets/Children.h>
 #include <lumora/Widgets/Props.h>
 #include <lumora/Widgets/TextSelection.h>
@@ -39,7 +40,7 @@ namespace lumora
         PositionProps         position{};
         bool                  anchor = false;
         InteractProps         on{};
-        Reactive<std::string> className{};
+        Str                   className{};
     };
 
     namespace detail

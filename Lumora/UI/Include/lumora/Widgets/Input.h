@@ -35,7 +35,7 @@ struct InputCfg {
     StyleProps                       style{.radius = 4.f, .border = {1.f, Color::Gray}};
     /// Space-separated CSS class list (reactive). When the app has a stylesheet, CSS drives
     /// fill/border/radius/color/padding for the field; otherwise the inline props above apply.
-    Reactive<std::string>            className{};
+    Str                              className{};
 };
 
 /// Text input editor (caret, selection, clipboard, undo/redo). Single-line by default; set multiLine to allow newlines.

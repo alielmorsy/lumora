@@ -1,5 +1,7 @@
 #include "Svg/PathParser.h"
 
+#include <lumora/FromChars.h>
+
 #include <algorithm>
 #include <charconv>
 #include <cmath>
@@ -93,7 +95,7 @@ namespace lumora::svg
                 float v = 0.f;
                 const char* b = m_s.data() + start;
                 const char* e = m_s.data() + m_i;
-                if (std::from_chars(b, e, v).ec != std::errc{})
+                if (FromChars(b, e, v).ec != std::errc{})
                 {
                     return false;
                 }

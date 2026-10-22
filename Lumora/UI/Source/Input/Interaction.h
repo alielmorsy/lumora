@@ -80,6 +80,7 @@ namespace lumora
         /// Monotonic seconds, advanced once per `MountedApp::Tick`; the only clock a dispatch handler can read (containers get no OnFrame).
         float   clock = 0.f;
         bool    focusVisible = false; ///< true only while focus last moved by keyboard - drives the ring
+        bool    focusTakesText = false; ///< the focused node edits text; hosts show the soft keyboard / IME while set
         style::StyleEngine* style = nullptr; ///< for writing CSS pseudo-state signals (:hover/:active/:focus)
 
         const TextMeasurer* fonts    = nullptr;

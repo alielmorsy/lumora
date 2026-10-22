@@ -44,7 +44,7 @@ struct AccordionCfg {
 
     LayoutProps           layout{};
     StyleProps            style{};
-    Reactive<std::string> className{};  ///< the root; header and body carry `-header` / `-body`
+    Str                   className{};  ///< the root; header and body carry `-header` / `-body`
 };
 
 /// A collapsible titled section (Column + header Row + `Show`, not a new node kind). The body is a builder, not an Elem: a

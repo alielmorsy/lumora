@@ -1,6 +1,7 @@
 #pragma once
 
 #include <lumora/Elem.h>
+#include <lumora/platform/Launch.h>
 
 #include <functional>
 #include <string>

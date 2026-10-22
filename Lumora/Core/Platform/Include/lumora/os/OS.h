@@ -1,5 +1,6 @@
 #pragma once
 
+#include <lumora/os/Asset.h>
 #include <lumora/os/CrashHandler.h>
 #include <lumora/os/DirectoryWatcher.h>
 #include <lumora/os/DynamicLibrary.h>

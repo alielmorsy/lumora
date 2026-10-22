@@ -21,7 +21,7 @@ namespace lumora
         Reactive<float> radius = 6.f;
         LayoutProps layout{.padding = Spacing::Symmetric(10.f, 20.f)};
         InteractProps on{};
-        Reactive<std::string> className{};
+        Str                   className{};
     };
 
     /// `on` is the bound boolean (two-way), not the interaction group.
@@ -34,7 +34,7 @@ namespace lumora
         FocusPolicy focusPolicy = FocusPolicy::Tab; ///< keyboard focus; None opts out, Click skips Tab
         int tabIndex = 0;
         bool autofocus = false;
-        Reactive<std::string> className{};
+        Str                   className{};
     };
 
     struct CheckboxCfg
@@ -50,7 +50,7 @@ namespace lumora
         FocusPolicy focusPolicy = FocusPolicy::Tab;
         int tabIndex = 0;
         bool autofocus = false;
-        Reactive<std::string> className{};
+        Str                   className{};
     };
 
     LUMORA_API Elem Button(ButtonCfg cfg = {});

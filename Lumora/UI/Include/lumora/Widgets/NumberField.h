@@ -43,7 +43,7 @@ namespace lumora
         int         tabIndex    = 0;
 
         LayoutProps           layout{};
-        Reactive<std::string> className{}; ///< the row; the label and the value carry `-label`/`-value`
+        Str                   className{}; ///< the row; the label and the value carry `-label`/`-value`
     };
 
     /// Composed component (Row + scrub Box + Text/Input), like ComboBox.
@@ -94,7 +94,7 @@ namespace lumora
         LayoutProps           layout{};
         Reactive<Color>       track = Color::Transparent; ///< unset -> a neutral derived from `fill`
         Reactive<Color>       fill  = Color::Transparent; ///< unset -> the framework accent
-        Reactive<std::string> className{};
+        Str                   className{};
     };
 
     /// Track + thumb over the same value contract as NumberField, for a field that declares a range.

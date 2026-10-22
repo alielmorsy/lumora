@@ -80,8 +80,11 @@ private:
 
 } // namespace pulse
 
-int main(int argc, char** argv)
+int lumora::platform::Main(const lumora::platform::LaunchArgs& args)
 {
+    const int argc = args.argc;
+    char** const argv = args.argv;
+
     // `--light`, `--detail` and `--speed N` pick the starting theme, tab and data rate (scripted runs).
     bool   light = false;
     int    tab   = 0;

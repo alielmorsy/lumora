@@ -1,3 +1,4 @@
+#include <lumora/FromChars.h>
 #include <lumora/Graph/Fields.h>
 #include <lumora/Graph/Graph.h>
 #include <lumora/Input/Event.h>
@@ -129,7 +130,7 @@ namespace lumora::nodegraph
             {
                 text.remove_prefix(1);
             }
-            const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), out);
+            const auto [end, error] = FromChars(text.data(), text.data() + text.size(), out);
             return error == std::errc{} && end == text.data() + text.size() && !text.empty();
         }
 

@@ -10,6 +10,7 @@ namespace lumora::platform
         Xlib,
         Wayland,
         Cocoa,
+        Android,
     };
 
     // Opaque native handles filled by the platform window and passed to the renderer; type-erased so no OS headers leak.

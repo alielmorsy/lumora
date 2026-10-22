@@ -91,8 +91,11 @@ private:
 
 }
 
-int main(int argc, char** argv)
+int lumora::platform::Main(const lumora::platform::LaunchArgs& args)
 {
+    const int argc = args.argc;
+    char** const argv = args.argv;
+
     // `--section N` opens on section N (lets the headless smoke run mount every page).
     int section = 0;
     bool dark = true;

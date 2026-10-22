@@ -18,7 +18,7 @@ struct TextCfg {
     TextFlowProps   flow{};
     LayoutProps     layout{};
     InteractProps   on{};
-    Reactive<std::string> className{};
+    Str                   className{};
 
     /// Opt this leaf into an enclosing TextSelectionScope: the scope drives the gesture and the leaf paints its share.
     /// `selectionKey` is the leaf's reading-order position across the scope (a row index for a list), not a node id, so it

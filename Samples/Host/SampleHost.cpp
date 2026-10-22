@@ -11,6 +11,7 @@
 #include <EmbeddedShaders.h>
 #include <lumora/log/Log.h>
 #include <lumora/log/Spdlog.h>
+#include <lumora/platform/SystemMetrics.h>
 #include <lumora/platform/Window.h>
 #include <lumora/rhi/Lumora.h>
 #include <lumora/rhi/RHI.h>
@@ -99,7 +100,8 @@ int RunWindowed(const SampleDesc& desc, bool validation, int exitAfter)
     device.Init({.enableValidation = validation, .enableDebugLabels = validation});
 
     rhi::SwapchainDescription sc{};
-    sc.nativeWindow = {native.window, native.instance, rhi::NativeWindowKind::Win32};
+    sc.nativeWindow = {native.window, native.instance,
+                       native.backend == platform::WindowBackend::Android ? rhi::NativeWindowKind::Android : rhi::NativeWindowKind::Win32};
     sc.extent       = {window->GetWidth(), window->GetHeight()};
     const rhi::SwapchainHandle swapchain = device.Swapchain().CreateSwapchain(sc);
 
@@ -113,22 +115,19 @@ int RunWindowed(const SampleDesc& desc, bool validation, int exitAfter)
     });
     ui->SetContentScale(window->GetDpiScale());
 
-    auto regular = ReadFile("C:/Windows/Fonts/segoeui.ttf");
-    auto bold    = ReadFile("C:/Windows/Fonts/segoeuib.ttf");
-    if (regular.empty()) {
-        regular = ReadFile("C:/Windows/Fonts/arial.ttf");
-        bold    = ReadFile("C:/Windows/Fonts/arialbd.ttf");
-    }
+    const platform::DefaultFontFiles fontFiles = platform::GetDefaultUiFont();
+    auto regular = ReadFile(fontFiles.regular.string().c_str());
+    auto bold    = ReadFile(fontFiles.bold.string().c_str());
     if (!regular.empty()) {
         ui->Fonts().RegisterFont(regular, {.family = "Sans"});
         ui->Fonts().SetDefaultFamily("Sans");
         if (!bold.empty())
             ui->Fonts().RegisterFont(bold, {.family = "Sans", .bold = true});
     } else {
-        LOG_WARN("No system font found (checked segoeui.ttf, arial.ttf)");
+        LOG_WARN("No system font found at {}", fontFiles.regular.string());
     }
 
-    ui->Mount(desc.root);
+    auto mounted = ui->Mount(desc.root);
     if (!desc.css.empty())
         ui->SetStylesheetSource(desc.css);
 
@@ -143,6 +142,8 @@ int RunWindowed(const SampleDesc& desc, bool validation, int exitAfter)
         window->PumpEvents();
         const auto now = std::chrono::steady_clock::now();
         ui->Update(std::chrono::duration<float>(now - last).count());
+        if (mounted)
+            window->SetTextInputActive(mounted->WantsTextInput());
         last = now;
 
         rhi::FrameContext ctx = device.BeginFrame(swapchain);

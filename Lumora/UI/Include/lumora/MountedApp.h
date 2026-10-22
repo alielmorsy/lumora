@@ -62,6 +62,9 @@ public:
     /// Activate the focused node (onClick / Enter); true if an action ran.
     bool ActivateFocused();
 
+    /// True while the focused node edits text; a host polls it per frame to show/hide the soft keyboard (Window::SetTextInputActive).
+    [[nodiscard]] bool WantsTextInput() const;
+
     /// Builder for the drag ghost, keyed on the payload the source published; one per app. Unset draws a small default marker.
     void SetDragPreview(std::function<Elem(const DragPayload&)> builder);
 

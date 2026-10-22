@@ -1,5 +1,7 @@
 #include "Svg/AttrParser.h"
 
+#include <lumora/FromChars.h>
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -60,7 +62,7 @@ namespace lumora::svg
                 return false;
             }
             float v = 0.f;
-            if (std::from_chars(s.data() + start, s.data() + i, v).ec != std::errc{})
+            if (FromChars(s.data() + start, s.data() + i, v).ec != std::errc{})
             {
                 return false;
             }

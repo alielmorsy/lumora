@@ -1,6 +1,7 @@
 #define VMA_IMPLEMENTATION
-#define VMA_STATIC_VULKAN_FUNCTIONS 1
-#define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
+// Dynamic: Android's libvulkan does not export 1.3 entry points the static path would link against.
+#define VMA_STATIC_VULKAN_FUNCTIONS 0
+#define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
 #include "VulkanRHI.h"
 
 #include "Translate.h"
@@ -411,7 +412,12 @@ void RHI::Init(const RHIInitDescription& desc)
 
     CreateDevice(*n);
 
+    VmaVulkanFunctions vkFns{};
+    vkFns.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
+    vkFns.vkGetDeviceProcAddr   = vkGetDeviceProcAddr;
+
     VmaAllocatorCreateInfo ai{};
+    ai.pVulkanFunctions = &vkFns;
     ai.physicalDevice   = n->physical;
     ai.device           = n->device;
     ai.instance         = n->instance;

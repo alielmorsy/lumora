@@ -29,7 +29,7 @@ private:
 
 } // namespace nodestudio
 
-int main(int argc, char** argv)
+int lumora::platform::Main(const lumora::platform::LaunchArgs& args)
 {
     return lumora::samples::RunSample({
         .title  = "NodeStudio",
@@ -37,5 +37,5 @@ int main(int argc, char** argv)
         .height = 800,
         .root   = [] { return lumora::Elem(nodestudio::NodeStudioApp{}); },
         .css    = nodestudio::kNodeStudioStylesheet
-    }, argc, argv);
+    }, args.argc, args.argv);
 }

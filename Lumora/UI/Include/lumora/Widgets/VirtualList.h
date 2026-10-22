@@ -3,6 +3,7 @@
 #include <lumora/Api.h>
 #include <lumora/Elem.h>
 #include <lumora/Reactive/Reactive.h>
+#include <lumora/Reactive/Str.h>
 #include <lumora/Widgets/Props.h>
 
 #include <cstdint>
@@ -41,7 +42,7 @@ namespace lumora
         TransformProps transform{};
         InteractProps on{};
 
-        Reactive<std::string> className{};
+        Str                   className{};
     };
 
     LUMORA_API Elem VirtualList(VirtualListCfg cfg);

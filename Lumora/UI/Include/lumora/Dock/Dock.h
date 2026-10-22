@@ -11,6 +11,7 @@
 #include <lumora/Foundation/Rect.h>
 #include <lumora/Foundation/Vec2.h>
 #include <lumora/Reactive/Reactive.h>
+#include <lumora/Reactive/Str.h>
 #include <lumora/Reactive/Signal.h>
 
 #include <cstddef>
@@ -244,7 +245,7 @@ namespace lumora
         Reactive<Color>                   color     = Color::Rgba(58, 64, 74, 255);
         std::function<void(float, float)> onDrag;   ///< (prevPx, nextPx) every move - live resize
         std::function<void(float, float)> onCommit; ///< (prevPx, nextPx) on release - persist
-        Reactive<std::string>             className{};
+        Str                               className{};
     };
 
     [[nodiscard]] LUMORA_API Elem Splitter(SplitterCfg cfg = {});

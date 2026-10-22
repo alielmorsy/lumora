@@ -546,6 +546,11 @@ namespace lumora
         FocusTraversal::Move(base, m_impl->interaction, m_impl->root, FocusDir::Backward);
     }
 
+    bool MountedApp::WantsTextInput() const
+    {
+        return m_impl->interaction.focusTakesText && m_impl->interaction.focused.Resolve(m_impl->arena).Valid();
+    }
+
     bool MountedApp::ActivateFocused()
     {
         if (!m_impl->root.Valid())

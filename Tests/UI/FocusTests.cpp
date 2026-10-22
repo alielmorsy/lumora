@@ -382,6 +382,31 @@ TEST(FocusTests, AutofocusInScopeFocusesOnMount) {
     EXPECT_EQ(autoFocused, 1);
 }
 
+TEST(FocusTests, WantsTextInputFollowsTheFocusedEditor) {
+    FakeFonts fonts;
+    BoxCfg    cfg{.layout = {.width = Fixed(100.f), .height = Fixed(20.f)}};
+    cfg.on.focusPolicy = FocusPolicy::Tab;
+
+    Signal<double>      number = Signal(0.0);
+    Signal<std::string> text   = Signal(std::string{});
+    MountedApp app(Column({}, Box(std::move(cfg)), NumberField({.value = number}), Input({.value = text})), &fonts);
+    app.SetInteractionEnv(&fonts, nullptr);
+    app.Layout(kSurfaceW, kSurfaceH);
+    EXPECT_FALSE(app.WantsTextInput());
+
+    app.Dispatch(KeyPress(Key::Tab));
+    EXPECT_FALSE(app.WantsTextInput());
+
+    app.Dispatch(KeyPress(Key::Tab));
+    EXPECT_TRUE(app.WantsTextInput());
+
+    app.Dispatch(KeyPress(Key::Tab));
+    EXPECT_TRUE(app.WantsTextInput());
+
+    app.ClearFocus();
+    EXPECT_FALSE(app.WantsTextInput());
+}
+
 TEST(FocusTests, ActivateFocusedTriggersOnClick) {
     FakeFonts fonts;
     Anchor btnAnchor;

@@ -15,6 +15,7 @@ public:
     Str() : Reactive(std::string{}) {}
     Str(const char* text) : Reactive(std::string(text ? text : "")) {}
     Str(std::string_view text) : Reactive(std::string(text)) {}
+    Str(Reactive<std::string> value) : Reactive(std::move(value)) {}
 };
 
 }

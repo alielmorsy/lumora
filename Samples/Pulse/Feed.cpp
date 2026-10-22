@@ -58,7 +58,11 @@ std::string ClockString(double offsetSeconds)
     const auto t = kStart + std::chrono::milliseconds(static_cast<long long>(offsetSeconds * 1000.0));
     const std::time_t secs = std::chrono::system_clock::to_time_t(t);
     std::tm tm{};
+#if defined(_WIN32)
     localtime_s(&tm, &secs);
+#else
+    localtime_r(&secs, &tm);
+#endif
     const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t.time_since_epoch()).count() % 1000;
     return std::format("{:02}:{:02}:{:02}.{:03}", tm.tm_hour, tm.tm_min, tm.tm_sec, ms);
 }

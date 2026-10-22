@@ -150,6 +150,7 @@ class InputWidget final : public TypedWidget<InputCfg> {
         switch (ev.Type) {
             case EventType::FocusGained:
                 p.focused = true;
+                ctx.state->focusTakesText = !p.disabled;
                 if (p.selectOnFocus) {
                     p.editor.SelectAll();
                 }

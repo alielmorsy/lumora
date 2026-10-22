@@ -4,6 +4,7 @@
 #include <lumora/Ref.h>
 #include <lumora/Detail/Node.h>
 #include <lumora/Elem.h>
+#include <lumora/Reactive/Str.h>
 #include <lumora/Widgets/Children.h>
 #include <lumora/Widgets/Props.h>
 
@@ -22,7 +23,7 @@ namespace lumora
         bool anchor = false; ///< establish a positioning context for absolute descendants
         InteractProps on{};
         /// Space-separated CSS class list; reactive, so toggling re-resolves style. Ignored when no StyleEngine is wired.
-        Reactive<std::string> className{};
+        Str                   className{};
         /// Pure-visual translation at PAINT and HIT-TEST time without dirtying layout.
         /// Changing it marks repaint only, preserving retained subtree replay.
         Reactive<Vec2> paintOffset{};

@@ -31,7 +31,7 @@ namespace lumora
         float radius   = 3.f;
 
         LayoutProps           layout{};
-        Reactive<std::string> className{};
+        Str                   className{};
     };
 
     [[nodiscard]] LUMORA_API Elem Badge(BadgeCfg cfg = {});

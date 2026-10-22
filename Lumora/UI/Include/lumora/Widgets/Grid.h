@@ -4,6 +4,7 @@
 #include <lumora/Ref.h>
 #include <lumora/Detail/Node.h>
 #include <lumora/Elem.h>
+#include <lumora/Reactive/Str.h>
 #include <lumora/Widgets/Children.h>
 #include <lumora/Widgets/Props.h>
 
@@ -81,7 +82,7 @@ namespace lumora
         PositionProps position{};
         bool anchor = false;
         InteractProps on{};
-        Reactive<std::string> className{};
+        Str                   className{};
     };
 
     /// A grid item with explicit placement; `col`/`row` are 0-based, -1 = auto-flow. A bare grid child auto-flows as 1x1, so
@@ -100,7 +101,7 @@ namespace lumora
         PositionProps position{};
         bool anchor = false;
         InteractProps on{};
-        Reactive<std::string> className{};
+        Str                   className{};
     };
 
     namespace detail

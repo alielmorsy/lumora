@@ -4,6 +4,7 @@
 #include <lumora/Ref.h>
 #include <lumora/Detail/Node.h>
 #include <lumora/Elem.h>
+#include <lumora/Reactive/Str.h>
 #include <lumora/Widgets/Children.h>
 #include <lumora/Widgets/Props.h>
 
@@ -19,7 +20,7 @@ namespace lumora
         ViewProps view{};
         TransformProps transform{};
         InteractProps on{};
-        Reactive<std::string> className{};
+        Str                   className{};
     };
 
     namespace detail

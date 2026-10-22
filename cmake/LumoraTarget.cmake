@@ -8,6 +8,11 @@ function(lumora_defaults target)
     else ()
         target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
     endif ()
+    if (ANDROID)
+        # NDK 28 libc++ keeps std::stop_token / jthread behind the experimental library.
+        target_compile_options(${target} PUBLIC -fexperimental-library)
+        target_link_options(${target} PUBLIC -fexperimental-library)
+    endif ()
 endfunction()
 
 # Copies the target's runtime DLLs next to it.

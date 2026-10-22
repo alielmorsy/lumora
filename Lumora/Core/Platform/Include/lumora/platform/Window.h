@@ -142,6 +142,9 @@ namespace lumora::platform
 
         virtual void SetFullscreenMode(FullscreenMode mode)  = 0;
 
+        /// Shows or hides the virtual keyboard / software input method editor.
+        virtual void SetTextInputActive(bool /*active*/) {}
+
         /// Capture hides the cursor, clips it to `clip` (empty = whole client area) and switches to relative motion:
         /// `InputEvent::delta` moves while `position` freezes.
         /// Safe to call every frame with a moving rect: a re-clip while captured re-anchors without touching the show-cursor counter.
