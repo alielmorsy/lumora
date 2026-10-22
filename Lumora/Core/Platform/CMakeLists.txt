@@ -17,7 +17,7 @@ if (WIN32)
             Source/OS/Windows/DirectoryWatcher.cpp
             Source/OS/Windows/Shell.cpp)
 else ()
-    message(FATAL_ERROR "lumora_platform: unsupported platform")
+    message(STATUS "lumora_platform: no backend for ${CMAKE_SYSTEM_NAME}, headless (common sources only)")
 endif ()
 
 add_library(lumora_platform STATIC ${_common} ${_os} ${_windows})

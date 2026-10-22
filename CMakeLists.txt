@@ -7,6 +7,7 @@ set(LUMORA_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
 option(LUMORA_BUILD_TESTS "Build the Lumora tests" ${PROJECT_IS_TOP_LEVEL})
 option(LUMORA_BUILD_SAMPLES "Build the Lumora samples" ${PROJECT_IS_TOP_LEVEL})
 option(LUMORA_BUILD_BENCHMARKS "Build the Lumora benchmarks" ${PROJECT_IS_TOP_LEVEL})
+option(LUMORA_BUILD_GPU "Build the Vulkan RHI and renderer" ON)
 
 if (PROJECT_IS_TOP_LEVEL)
     if (MSVC)

@@ -18,11 +18,41 @@
       "displayName": "Release",
       "inherits": "base",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "linux-base",
+      "hidden": true,
+      "inherits": "base",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
+      "cacheVariables": { "LUMORA_BUILD_GPU": "OFF", "LUMORA_BUILD_SAMPLES": "OFF" }
+    },
+    {
+      "name": "linux-profile",
+      "displayName": "Linux RelWithDebInfo (perf)",
+      "inherits": "linux-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_FLAGS": "-fno-omit-frame-pointer"
+      }
+    },
+    {
+      "name": "linux-asan",
+      "displayName": "Linux ASan + UBSan",
+      "inherits": "linux-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address,undefined"
+      }
     }
   ],
   "buildPresets": [
     { "name": "debug", "configurePreset": "debug" },
-    { "name": "release", "configurePreset": "release" }
+    { "name": "release", "configurePreset": "release" },
+    { "name": "linux-profile", "configurePreset": "linux-profile" },
+    { "name": "linux-asan", "configurePreset": "linux-asan" }
   ],
   "testPresets": [
     {
@@ -31,6 +61,13 @@
       "output": { "outputOnFailure": true },
       "execution": { "jobs": 8 },
       "environment": { "LUMORA_NO_DIALOGS": "1" }
+    },
+    {
+      "name": "linux-asan",
+      "configurePreset": "linux-asan",
+      "output": { "outputOnFailure": true },
+      "execution": { "jobs": 8 },
+      "environment": { "LUMORA_NO_DIALOGS": "1", "UBSAN_OPTIONS": "print_stacktrace=1" }
     }
   ]
 }
