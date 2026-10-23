@@ -281,6 +281,19 @@ namespace lumora::platform
         }
     }
 
+    void WindowsWindow::WaitEvents()
+    {
+        ::WaitMessage();
+    }
+
+    void WindowsWindow::Wake()
+    {
+        if (_hwnd)
+        {
+            ::PostMessageW(_hwnd, WM_NULL, 0, 0);
+        }
+    }
+
     void WindowsWindow::PumpEvents()
     {
         PumpMessages();

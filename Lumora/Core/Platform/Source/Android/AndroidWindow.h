@@ -16,6 +16,9 @@ namespace lumora::platform
         explicit AndroidWindow(const WindowDesc& desc);
         ~AndroidWindow() override;
 
+        void WaitEvents() override;
+        void Wake() override;
+
         void PumpEvents() override;
         void PumpMessages() override;
         void FlushEvents() override;

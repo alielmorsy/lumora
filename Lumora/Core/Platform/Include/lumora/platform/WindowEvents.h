@@ -11,6 +11,8 @@ namespace lumora::platform
         FocusGained,
         FocusLost,
         DpiChanged,
+        SurfaceCreated,
+        SurfaceDestroyed,
     };
 
     struct WindowEvent

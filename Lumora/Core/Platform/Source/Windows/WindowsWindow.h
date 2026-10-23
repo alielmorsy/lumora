@@ -16,6 +16,9 @@ namespace lumora::platform
 
         ~WindowsWindow() override;
 
+        void WaitEvents() override;
+        void Wake() override;
+
         void PumpEvents() override;
 
         void PumpMessages() override;

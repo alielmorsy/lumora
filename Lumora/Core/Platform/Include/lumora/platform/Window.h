@@ -96,6 +96,12 @@ namespace lumora::platform
         /// True if any live window has not yet requested close.
         [[nodiscard]] static bool AnyOpen();
 
+        /// Blocks until OS input or Wake() is called; caller then runs PumpEvents.
+        virtual void WaitEvents() {}
+
+        /// Thread-safe: wakes a thread blocked in WaitEvents().
+        virtual void Wake() {}
+
         /// PumpMessages() then FlushEvents(); only legal where subscriber callbacks are legal (see FlushEvents).
         virtual void PumpEvents() = 0;
 

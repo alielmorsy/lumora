@@ -12,6 +12,50 @@ namespace lumora::platform
     {
         AndroidWindow* g_currentWindow = nullptr;
 
+        bool (*g_origOnTouchEvent)(GameActivity*, const GameActivityMotionEvent*) = nullptr;
+        bool (*g_origOnKeyDown)(GameActivity*, const GameActivityKeyEvent*) = nullptr;
+        bool (*g_origOnKeyUp)(GameActivity*, const GameActivityKeyEvent*) = nullptr;
+        void (*g_origOnTextInputEvent)(GameActivity*, const GameTextInputState*) = nullptr;
+
+        void WakeAndroidLooper()
+        {
+            android_app* app = android::App();
+            if (app && app->looper)
+            {
+                ALooper_wake(app->looper);
+            }
+        }
+
+        bool WrappedOnTouchEvent(GameActivity* activity, const GameActivityMotionEvent* event)
+        {
+            const bool res = g_origOnTouchEvent ? g_origOnTouchEvent(activity, event) : false;
+            WakeAndroidLooper();
+            return res;
+        }
+
+        bool WrappedOnKeyDown(GameActivity* activity, const GameActivityKeyEvent* event)
+        {
+            const bool res = g_origOnKeyDown ? g_origOnKeyDown(activity, event) : false;
+            WakeAndroidLooper();
+            return res;
+        }
+
+        bool WrappedOnKeyUp(GameActivity* activity, const GameActivityKeyEvent* event)
+        {
+            const bool res = g_origOnKeyUp ? g_origOnKeyUp(activity, event) : false;
+            WakeAndroidLooper();
+            return res;
+        }
+
+        void WrappedOnTextInputEvent(GameActivity* activity, const GameTextInputState* state)
+        {
+            if (g_origOnTextInputEvent)
+            {
+                g_origOnTextInputEvent(activity, state);
+            }
+            WakeAndroidLooper();
+        }
+
         Key MapAndroidKeyCode(int32_t keyCode)
         {
             switch (keyCode)
@@ -153,6 +197,32 @@ namespace lumora::platform
         {
             app->userData = this;
             app->onAppCmd = HandleAppCmd;
+
+            if (app->activity && app->activity->callbacks)
+            {
+                auto* cb = app->activity->callbacks;
+                if (cb->onTouchEvent != WrappedOnTouchEvent)
+                {
+                    g_origOnTouchEvent = cb->onTouchEvent;
+                    cb->onTouchEvent = WrappedOnTouchEvent;
+                }
+                if (cb->onKeyDown != WrappedOnKeyDown)
+                {
+                    g_origOnKeyDown = cb->onKeyDown;
+                    cb->onKeyDown = WrappedOnKeyDown;
+                }
+                if (cb->onKeyUp != WrappedOnKeyUp)
+                {
+                    g_origOnKeyUp = cb->onKeyUp;
+                    cb->onKeyUp = WrappedOnKeyUp;
+                }
+                if (cb->onTextInputEvent != WrappedOnTextInputEvent)
+                {
+                    g_origOnTextInputEvent = cb->onTextInputEvent;
+                    cb->onTextInputEvent = WrappedOnTextInputEvent;
+                }
+            }
+
             UpdateDpi();
 
             while (!_window && !app->destroyRequested)
@@ -173,10 +243,21 @@ namespace lumora::platform
     AndroidWindow::~AndroidWindow()
     {
         android_app* app = android::App();
-        if (app && app->userData == this)
+        if (app)
         {
-            app->userData = nullptr;
-            app->onAppCmd = nullptr;
+            if (app->activity && app->activity->callbacks)
+            {
+                auto* cb = app->activity->callbacks;
+                if (cb->onTouchEvent == WrappedOnTouchEvent) cb->onTouchEvent = g_origOnTouchEvent;
+                if (cb->onKeyDown == WrappedOnKeyDown) cb->onKeyDown = g_origOnKeyDown;
+                if (cb->onKeyUp == WrappedOnKeyUp) cb->onKeyUp = g_origOnKeyUp;
+                if (cb->onTextInputEvent == WrappedOnTextInputEvent) cb->onTextInputEvent = g_origOnTextInputEvent;
+            }
+            if (app->userData == this)
+            {
+                app->userData = nullptr;
+                app->onAppCmd = nullptr;
+            }
         }
         if (g_currentWindow == this)
         {
@@ -193,6 +274,12 @@ namespace lumora::platform
             _height = static_cast<uint32_t>(ANativeWindow_getHeight(_window));
         }
         UpdateDpi();
+        _events.Publish(WindowEvent{
+            .type = WindowEventType::SurfaceCreated,
+            .width = _width,
+            .height = _height,
+            .dpiScale = _dpiScale,
+        });
         _pendingEvents.push_back(WindowEvent{
             .type = WindowEventType::Resize,
             .width = _width,
@@ -203,6 +290,12 @@ namespace lumora::platform
 
     void AndroidWindow::OnTermWindow()
     {
+        _events.Publish(WindowEvent{
+            .type = WindowEventType::SurfaceDestroyed,
+            .width = 0,
+            .height = 0,
+            .dpiScale = _dpiScale,
+        });
         _window = nullptr;
         _width = 0;
         _height = 0;
@@ -491,6 +584,40 @@ namespace lumora::platform
             _input.Publish(in);
         }
         _pendingInput.clear();
+    }
+
+    void AndroidWindow::WaitEvents()
+    {
+        android_app* app = android::App();
+        if (!app) return;
+
+        if (!_pendingEvents.empty() || !_pendingInput.empty())
+        {
+            return;
+        }
+
+        int events = 0;
+        android_poll_source* source = nullptr;
+        if (ALooper_pollOnce(-1, nullptr, &events, reinterpret_cast<void**>(&source)) >= 0)
+        {
+            if (source)
+            {
+                source->process(app, source);
+            }
+            if (app->destroyRequested)
+            {
+                _shouldClose = true;
+            }
+        }
+    }
+
+    void AndroidWindow::Wake()
+    {
+        android_app* app = android::App();
+        if (app && app->looper)
+        {
+            ALooper_wake(app->looper);
+        }
     }
 
     void AndroidWindow::PumpEvents()
