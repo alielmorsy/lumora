@@ -36,6 +36,30 @@ namespace lumora::platform
 #endif
         }
 
+        void* PthreadToHandle(pthread_t pt) noexcept
+        {
+            void* handle = nullptr;
+            static_assert(sizeof(pt) <= sizeof(handle));
+            std::memcpy(&handle, &pt, sizeof(pt));
+            return handle;
+        }
+
+        pthread_t HandleToPthread(void* handle) noexcept
+        {
+            pthread_t pt{};
+            static_assert(sizeof(pt) <= sizeof(handle));
+            std::memcpy(&pt, &handle, sizeof(pt));
+            return pt;
+        }
+
+        ThreadId PthreadToThreadId(pthread_t pt) noexcept
+        {
+            uint64_t id = 0;
+            static_assert(sizeof(pt) <= sizeof(id));
+            std::memcpy(&id, &pt, sizeof(pt));
+            return static_cast<ThreadId>(id);
+        }
+
         struct PosixThreadStartContext
         {
             std::string name;
@@ -125,7 +149,7 @@ namespace lumora::platform
         {
             return static_cast<ThreadId>(tid);
         }
-        return static_cast<ThreadId>(reinterpret_cast<uintptr_t>(pthread_self()));
+        return PthreadToThreadId(pthread_self());
     }
 
     Thread::Thread() noexcept = default;
@@ -186,7 +210,7 @@ namespace lumora::platform
         }
         ctx->cv.notify_one();
 
-        m_handle = reinterpret_cast<void*>(static_cast<uintptr_t>(pt));
+        m_handle = PthreadToHandle(pt);
         return true;
     }
 
@@ -194,7 +218,7 @@ namespace lumora::platform
     {
         if (m_handle != nullptr)
         {
-            const pthread_t pt = static_cast<pthread_t>(reinterpret_cast<uintptr_t>(m_handle));
+            const pthread_t pt = HandleToPthread(m_handle);
             pthread_join(pt, nullptr);
             m_handle = nullptr;
             m_id = 0;
