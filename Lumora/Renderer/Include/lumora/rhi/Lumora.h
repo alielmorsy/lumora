@@ -7,6 +7,7 @@
 #include <lumora/Elem.h>
 #include <lumora/Foundation/Vec2.h>
 #include <lumora/MountedApp.h>
+#include <lumora/Paint/DisplayList.h>
 #include <lumora/Text/FontSystem.h>
 #include <lumora/Text/TextMeasurer.h>
 #include <lumora/Widgets/Component.h>
@@ -43,8 +44,21 @@ namespace lumora
     class ImageProvider;
     class Lumora;
 
+    /// One recorded frame, handed from the UI thread (RecordFrame) to the render thread (RenderFrame). RenderFrame consumes
+    /// it: the list is swapped out, ops are cleared and atlas versions zeroed, so render each packet exactly once, in order.
+    struct FramePacket
+    {
+        DisplayList   list;            // whole frame: every app + focus ring + debug/perf overlays
+        bool          reuse = false;   // nothing changed: re-present last frame
+        float         contentScale = 1.f;
+        rhi::Extent2D extent{};        // physical size the UI laid out for
+        std::uint64_t seq = 0;
+        AtlasDelta    atlas[2];        // [Coverage, Color]
+        PainterOps    ops;
+    };
+
     /// Construction parameters; every field is optional and defaults to an owned object. A null `rhi` runs headless
-    /// (Update/Layout run, Paint is a no-op).
+    /// (Update/Layout/RecordFrame run, Paint and RenderFrame are no-ops).
     /// Pass your own `measurer`/`clipboard` to swap the defaults (e.g. in tests).
     struct LumoraDesc
     {
@@ -108,10 +122,19 @@ namespace lumora
 
         /// Per frame, in order: Update ticks reactive graphs, Layout solves every app, Paint emits every app into `target`.
         /// Pass `clear` when the UI owns `target`; leave it unset to composite over an existing scene (loadOp=Load).
+        /// Paint is RecordFrame + RenderFrame on the calling thread.
         void Update(float deltaSeconds);
         void Layout(float width, float height);
         void Paint(rhi::CommandBuffer& cmd, std::uint32_t frameIndex, rhi::TextureViewHandle target,
                    rhi::Extent2D extent, std::optional<rhi::Color> clear = std::nullopt);
+
+        /// UI thread, after Update + Layout: records the frame into `out` (overwritten). Needs no GPU.
+        void RecordFrame(FramePacket& out, rhi::Extent2D extent);
+        /// Render thread, inside the host's frame and outside any render scope: uploads the packet's images and atlas rows,
+        /// then draws its list into `target`. Touches only the painter and render-owned state.
+        void RenderFrame(FramePacket& in, rhi::CommandBuffer& cmd, std::uint32_t frameIndex,
+                         rhi::TextureViewHandle target, rhi::Extent2D extent,
+                         std::optional<rhi::Color> clear = std::nullopt);
 
         /// Sets the display's logical to physical pixel ratio (OS DPI scale); the UI is laid out in logical pixels and scaled
         /// at the surface.
@@ -134,7 +157,7 @@ namespace lumora
         [[nodiscard]] Clipboard& ClipboardRef() const noexcept { return *m_clipboard; }
 
         // Registers an external RHI texture view as an opaque ImageHandle. The view is borrowed: ReleaseImage never destroys
-        // the texture. Invalid when headless.
+        // the texture. Invalid when headless. Both are UI-thread calls; a release takes effect at the next RenderFrame.
         [[nodiscard]] ImageHandle RegisterExternalImage(rhi::TextureViewHandle view, std::uint32_t width,
                                                         std::uint32_t height);
         void ReleaseImage(ImageHandle image);
@@ -142,15 +165,29 @@ namespace lumora
     private:
         MountedApp* MountRoot(Elem root);
 
+        // UI thread: everything below except the render-thread block.
         std::optional<FontSystem> m_ownedFonts;
         DefaultClipboard m_ownedClipboard;
         TextMeasurer* m_measurer = nullptr;
         Clipboard* m_clipboard = nullptr;
         AssetLoader m_assetLoader = nullptr;
 
-        rhi::RHI* m_rhi = nullptr;
+        rhi::RHI* m_rhi = nullptr; // set once at construction
+        // Render thread, except its "any thread"/"UI thread" calls (UploadTexture, FreeTexture, RegisterExternalTexture,
+        // TakePendingOps).
         RHIPainter m_painter;
+        DisplayList m_lastList; // render thread: the last list drawn, replayed when the canvas cannot reuse its geometry
+        FramePacket m_syncPacket; // Paint's packet
         std::unique_ptr<ImageProvider> m_imageProvider; // GPU image decoder/cache; null when headless
+
+        struct SentAtlas
+        {
+            std::uint64_t version = 0;
+            int width = 0;
+            int height = 0;
+        };
+        SentAtlas m_sentAtlas[2]{}; // last atlas state put in a packet, per plane
+        std::uint64_t m_frameSeq = 0;
 
         float m_contentScale = 1.f;
         bool  m_scaleDirty   = false; // a scale change needs a glyph-atlas warm pass before next upload

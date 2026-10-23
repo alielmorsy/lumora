@@ -112,6 +112,23 @@ namespace lumora
         return true;
     }
 
+    std::uint32_t DisplayList::RecordCount() const noexcept
+    {
+        std::uint32_t n = 0;
+        std::size_t offset = 0;
+        while (offset + sizeof(PaintRecord) <= m_bytes.size())
+        {
+            const PaintRecord header = ReadAs<PaintRecord>(m_bytes.data() + offset);
+            if (header.bytes < sizeof(PaintRecord))
+            {
+                break;
+            }
+            offset += header.bytes;
+            ++n;
+        }
+        return n;
+    }
+
     void DisplayList::RecordRect(const RectCmd& rect)
     {
         Write(Open(PaintOp::Rect, sizeof(RectCmd)), &rect, sizeof(RectCmd));

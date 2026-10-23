@@ -451,6 +451,36 @@ namespace lumora
         app.PublishFrame();
     }
 
+    void MountedApp::RecordInto(DisplayList& out)
+    {
+        Impl& app = *m_impl;
+        app.ctx.pointerPos = app.interaction.pointerPos;
+        DisplayListCanvas canvas(out);
+
+        if (app.reuse == PaintReuse::Off)
+        {
+            lumora::Paint(app.ctx, app.root, canvas);
+        }
+        else
+        {
+            const bool full = app.NeedsFullRecord(Vec2{app.appliedSurfaceW, app.appliedSurfaceH},
+                                                  /*commit=*/true);
+            if (!full && !app.TreeWantsRepaint())
+            {
+                ++app.live.paintFrameReused;
+                app.live.paintRecordedBytes = app.paint.current.Size();
+            }
+            else
+            {
+                lumora::Record(app.ctx, app.root, app.paint, app.reuse == PaintReuse::Subtree && !full);
+            }
+            (void)out.Append(app.paint.current, 0, app.paint.current.Size());
+            app.live.paintReplayed += app.paint.current.RecordCount();
+        }
+        lumora::PaintFocusRing(app.ctx, app.interaction, canvas);
+        app.PublishFrame();
+    }
+
     bool MountedApp::WantsRepaint()
     {
         if (m_impl->reuse == PaintReuse::Off)
