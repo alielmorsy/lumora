@@ -296,6 +296,9 @@ namespace lumora
 
     void Lumora::RecordFrame(FramePacket& out, rhi::Extent2D extent)
     {
+        // The warm pass commits the new scale inside the apps, so they would report nothing to repaint; the render side's
+        // retained geometry is still at the old scale, so this frame must not reuse.
+        const bool scaleChanged = m_scaleDirty;
         if (m_scaleDirty)
         {
             TIMER_START(t0);
@@ -312,7 +315,7 @@ namespace lumora
         // Whole-frame skip: every app's retained recording is current and no host overlay is drawing, so the render side
         // re-presents last frame's geometry. Apps are told so their counters describe a real frame.
         const bool overlays = m_debugOverlay || m_perfOverlay;
-        bool wanted = overlays;
+        bool wanted = overlays || scaleChanged;
         if (!overlays)
         {
             for (auto& app : m_apps)
