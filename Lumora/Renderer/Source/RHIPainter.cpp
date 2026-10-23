@@ -470,6 +470,7 @@ namespace lumora
                 if (ptr != nullptr)
                 {
                     std::memcpy(ptr, pattern.data(), pattern.size() * sizeof(std::uint32_t));
+                    rhi->Resources().FlushMapped(quadIndexBuffer, 0, pattern.size() * sizeof(std::uint32_t));
                 }
             }
         }
@@ -901,6 +902,7 @@ namespace lumora
                 {
                     std::memcpy(vp, verts.data(), verts.size_bytes());
                     std::memcpy(vp + verts.size_bytes(), maskVerts.data(), maskVerts.size_bytes());
+                    res.FlushMapped(ring.vertex, 0, verts.size_bytes() + maskVerts.size_bytes());
                     _impl->rings.MarkUploaded(_impl->frameIndex, generation);
                 }
                 vbuf = ring.vertex;

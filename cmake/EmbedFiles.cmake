@@ -1,9 +1,12 @@
-# Embeds all .spv files in INPUT_DIR into C++ source and header files.
+# Embeds all PATTERN files (default *.spv) in INPUT_DIR into C++ source and header files.
 if (NOT DEFINED INPUT_DIR OR NOT DEFINED OUTPUT_HEADER OR NOT DEFINED OUTPUT_SOURCE)
     message(FATAL_ERROR "INPUT_DIR, OUTPUT_HEADER, and OUTPUT_SOURCE must be defined")
 endif ()
+if (NOT DEFINED PATTERN)
+    set(PATTERN "*.spv")
+endif ()
 
-file(GLOB _files LIST_DIRECTORIES false "${INPUT_DIR}/*.spv")
+file(GLOB _files LIST_DIRECTORIES false "${INPUT_DIR}/${PATTERN}")
 list(SORT _files)
 
 set(_entries "")

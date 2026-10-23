@@ -86,6 +86,16 @@ std::vector<std::byte> ReadFile(const char* path)
     return bytes;
 }
 
+rhi::NativeWindowHandles ToRhiHandles(const platform::NativeWindowHandle& h)
+{
+    rhi::NativeWindowKind kind = rhi::NativeWindowKind::Win32;
+    if (h.backend == platform::WindowBackend::Android)
+        kind = rhi::NativeWindowKind::Android;
+    else if (h.backend == platform::WindowBackend::Web)
+        kind = rhi::NativeWindowKind::Web;
+    return {.window = h.window, .instance = h.instance, .kind = kind};
+}
+
 struct EventInbox
 {
     std::mutex mutex;
@@ -132,8 +142,7 @@ int RunWindowed(const SampleDesc& desc, bool validation, int exitAfter)
     device.Init({.enableValidation = validation, .enableDebugLabels = validation});
 
     rhi::SwapchainDescription sc{};
-    sc.nativeWindow = {native.window, native.instance,
-                       native.backend == platform::WindowBackend::Android ? rhi::NativeWindowKind::Android : rhi::NativeWindowKind::Win32};
+    sc.nativeWindow = ToRhiHandles(native);
     sc.extent       = {window->GetWidth(), window->GetHeight()};
     const rhi::SwapchainHandle swapchain = device.Swapchain().CreateSwapchain(sc);
 
@@ -168,13 +177,7 @@ int RunWindowed(const SampleDesc& desc, bool validation, int exitAfter)
         } else if (e.type == platform::WindowEventType::SurfaceCreated) {
             std::lock_guard<std::mutex> lk(rtMutex);
             if (activeRenderThread) {
-                const auto curNative = window->GetNativeHandle();
-                rhi::NativeWindowHandles h{
-                    .window = curNative.window,
-                    .instance = curNative.instance,
-                    .kind = curNative.backend == platform::WindowBackend::Android ? rhi::NativeWindowKind::Android : rhi::NativeWindowKind::Win32,
-                };
-                activeRenderThread->SetSurface(h);
+                activeRenderThread->SetSurface(ToRhiHandles(window->GetNativeHandle()));
             }
         } else {
             std::lock_guard<std::mutex> lock(inbox.mutex);

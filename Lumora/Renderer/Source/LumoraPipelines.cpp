@@ -106,7 +106,8 @@ bool LumoraPipelines::Create(rhi::RHI& rhi, std::string_view spirvDir, rhi::Form
     const std::array<DescriptorLayoutHandle, 1> texSets{_texturedLayout};
     const std::array<DescriptorLayoutHandle, 1> maskSet{_maskLayout};
 
-    const auto build = [&](std::string_view vsFile, std::string_view psFile,
+    // Vulkan: <shader>.{vert,frag}.spv. WebGPU: one <shader>.wgsl holding both entry points.
+    const auto build = [&](std::string_view shader,
                            std::span<const DescriptorLayoutHandle> sets,
                            std::span<const PushConstantRange> push, const BlendState& blendIn,
                            const VertexLayout& vtx, Format fmt,
@@ -121,14 +122,19 @@ bool LumoraPipelines::Create(rhi::RHI& rhi, std::string_view spirvDir, rhi::Form
             }
             return bytes;
         };
-        const std::vector<std::byte> vs = load(vsFile);
-        const std::vector<std::byte> ps = load(psFile);
+#if defined(__EMSCRIPTEN__)
+        const std::vector<std::byte> vs = load(std::string(shader) + ".wgsl");
+        const std::vector<std::byte> ps = vs;
+#else
+        const std::vector<std::byte> vs = load(std::string(shader) + ".vert.spv");
+        const std::vector<std::byte> ps = load(std::string(shader) + ".frag.spv");
+#endif
         if (vs.empty() || ps.empty()) {
             return {};
         }
         const std::array<ShaderStageDesc, 2> stages{
-            ShaderStageDesc{.stage = ShaderStageFlags::Vertex, .spirv = vs, .entryPoint = "VSMain"},
-            ShaderStageDesc{.stage = ShaderStageFlags::Fragment, .spirv = ps, .entryPoint = "PSMain"}};
+            ShaderStageDesc{.stage = ShaderStageFlags::Vertex, .code = vs, .entryPoint = "VSMain"},
+            ShaderStageDesc{.stage = ShaderStageFlags::Fragment, .code = ps, .entryPoint = "PSMain"}};
         const std::array<Format, 1> cf{fmt};
         PipelineDescription desc{};
         desc.type          = PipelineType::Graphics;
@@ -147,18 +153,18 @@ bool LumoraPipelines::Create(rhi::RHI& rhi, std::string_view spirvDir, rhi::Form
     };
 
     _pipelines[static_cast<std::size_t>(PipelineKind::Rect)] =
-        build("LumoraRect.vert.spv", "LumoraRect.frag.spv", maskSet, rectPush, blend, vertex, colorFormat,
+        build("LumoraRect", maskSet, rectPush, blend, vertex, colorFormat,
               "Lumora.Rect");
     _pipelines[static_cast<std::size_t>(PipelineKind::Textured)] =
-        build("LumoraTextured.vert.spv", "LumoraTextured.frag.spv", texSets, basePush, blend, vertex, colorFormat,
+        build("LumoraTextured", texSets, basePush, blend, vertex, colorFormat,
               "Lumora.Textured");
     _pipelines[static_cast<std::size_t>(PipelineKind::Tris)] =
-        build("LumoraTris.vert.spv", "LumoraTris.frag.spv", maskSet, basePush, blend, posColVertex, colorFormat,
+        build("LumoraTris", maskSet, basePush, blend, posColVertex, colorFormat,
               "Lumora.Tris");
     _pipelines[static_cast<std::size_t>(PipelineKind::Sdf)] =
-        build("LumoraSDF.vert.spv", "LumoraSDF.frag.spv", maskSet, sdfPush, blend, vertex, colorFormat, "Lumora.Sdf");
+        build("LumoraSDF", maskSet, sdfPush, blend, vertex, colorFormat, "Lumora.Sdf");
     _pipelines[static_cast<std::size_t>(PipelineKind::Mask)] =
-        build("LumoraMask.vert.spv", "LumoraMask.frag.spv", {}, maskPush, maskBlend, posColVertex, Format::R8_Unorm,
+        build("LumoraMask", {}, maskPush, maskBlend, posColVertex, Format::R8_Unorm,
               "Lumora.Mask");
 
     const bool ok = _pipelines[0].IsValid() && _pipelines[1].IsValid() && _pipelines[2].IsValid() &&
