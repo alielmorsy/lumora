@@ -142,6 +142,25 @@ TEST(CountersTests, OneLeafWriteDoesNotRestyleTheTree) {
     EXPECT_LE(c.solveCalls, 3u);
 }
 
+TEST(CountersTests, AGetterReturningTheSameValueDirtiesNothing) {
+    FakeFonts fonts;
+    const Signal<int> n{0};
+    const Reactive<std::string> label([n] { return std::string(n() < 10 ? "low" : "high"); });
+    MountedApp app(Column(ColumnCfg{.layout = {.width = Expand, .height = Expand}}, Text(label, TextCfg{.size = 12.f})),
+                   &fonts);
+    Drive(app, 4);
+
+    app.RunScoped([n] { n = 1; });
+    const FrameCounters same = Drive(app, 1);
+    EXPECT_EQ(same.refreshDirty, 0u);
+    EXPECT_EQ(same.solveCalls, 0u);
+    EXPECT_EQ(same.emitVisited, 0u);
+
+    app.RunScoped([n] { n = 10; });
+    const FrameCounters changed = Drive(app, 1);
+    EXPECT_GE(changed.refreshDirty, 1u);
+}
+
 TEST(CountersTests, UnchangedTreeReEmitsNothing) {
     FakeFonts fonts;
     const Signal<Color> fill{Color::Hex(0xFF202027)};

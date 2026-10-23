@@ -10,6 +10,8 @@
 #include "Node/Payloads.h"
 #include "Runtime/AppCtx.h"
 
+#include <concepts>
+#include <optional>
 #include <utility>
 
 namespace lumora
@@ -29,6 +31,7 @@ namespace lumora
 
     /// Binds one reactive prop onto a live field: constant props write once at mount; dynamic props get an owner-scoped effect
     /// that re-writes the field and raises `flag` (patching, never re-instantiating). `apply` must be idempotent.
+    /// A re-run yielding the value last applied is dropped: a getter prop has no equality gate of its own (Signal/Computed do).
     template <typename T, typename Apply>
     void BindProp(NodeArena& arena, NodeId id, const Reactive<T>& prop, Apply apply, Dirty flag)
     {
@@ -38,9 +41,17 @@ namespace lumora
             return;
         }
         NodeArena* arenaPtr = &arena;
-        Effect([arenaPtr, id, prop, apply = std::move(apply), flag]
+        Effect([arenaPtr, id, prop, apply = std::move(apply), flag, last = std::optional<T>{}]() mutable
         {
             const T& value = prop.Get();
+            if constexpr (std::equality_comparable<T>)
+            {
+                if (last && *last == value)
+                {
+                    return;
+                }
+                last = value;
+            }
             apply(*arenaPtr, id, value);
             arenaPtr->Resolve(id).MarkDirty(flag);
         });
