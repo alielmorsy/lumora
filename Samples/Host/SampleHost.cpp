@@ -137,11 +137,16 @@ int RunWindowed(const SampleDesc& desc, bool validation, int exitAfter)
     sc.extent       = {window->GetWidth(), window->GetHeight()};
     const rhi::SwapchainHandle swapchain = device.Swapchain().CreateSwapchain(sc);
 
+    const float initialDpi = window->GetDpiScale();
+    const uint32_t initWidth = window->GetWidth();
+    const uint32_t initHeight = window->GetHeight();
+    std::atomic<uint32_t> windowWidth = initWidth;
+    std::atomic<uint32_t> windowHeight = initHeight;
+
     EventInbox inbox;
     std::atomic<bool> quit = false;
-    std::atomic<RenderThread*> activeRenderThread = nullptr;
-    std::atomic<uint32_t> windowWidth = static_cast<uint32_t>(desc.width);
-    std::atomic<uint32_t> windowHeight = static_cast<uint32_t>(desc.height);
+    RenderThread* activeRenderThread = nullptr;
+    std::mutex rtMutex;
 
     const auto inputSub = window->InputEvents().Subscribe([&](const platform::InputEvent& e) {
         std::lock_guard<std::mutex> lock(inbox.mutex);
@@ -156,18 +161,20 @@ int RunWindowed(const SampleDesc& desc, bool validation, int exitAfter)
         if (e.type == platform::WindowEventType::Close) {
             quit = true;
         } else if (e.type == platform::WindowEventType::SurfaceDestroyed) {
-            if (auto* rt = activeRenderThread.load()) {
-                rt->LoseSurface();
+            std::lock_guard<std::mutex> lk(rtMutex);
+            if (activeRenderThread) {
+                activeRenderThread->LoseSurface();
             }
         } else if (e.type == platform::WindowEventType::SurfaceCreated) {
-            if (auto* rt = activeRenderThread.load()) {
+            std::lock_guard<std::mutex> lk(rtMutex);
+            if (activeRenderThread) {
                 const auto curNative = window->GetNativeHandle();
                 rhi::NativeWindowHandles h{
                     .window = curNative.window,
                     .instance = curNative.instance,
                     .kind = curNative.backend == platform::WindowBackend::Android ? rhi::NativeWindowKind::Android : rhi::NativeWindowKind::Win32,
                 };
-                rt->SetSurface(h);
+                activeRenderThread->SetSurface(h);
             }
         } else {
             std::lock_guard<std::mutex> lock(inbox.mutex);
@@ -187,7 +194,7 @@ int RunWindowed(const SampleDesc& desc, bool validation, int exitAfter)
                 },
                 .colorFormat = device.Swapchain().GetSwapchainFormat(swapchain),
             });
-            ui->SetContentScale(window->GetDpiScale());
+            ui->SetContentScale(initialDpi);
 
             const platform::DefaultFontFiles fontFiles = platform::GetDefaultUiFont();
             auto regular = ReadFile(fontFiles.regular.string().c_str());
@@ -209,10 +216,12 @@ int RunWindowed(const SampleDesc& desc, bool validation, int exitAfter)
                 .device = device,
                 .ui = *ui,
                 .swapchain = swapchain,
-                .wakeUi = [&] { window->Wake(); },
                 .getWindowExtent = [&] { return rhi::Extent2D{windowWidth.load(), windowHeight.load()}; },
             });
-            activeRenderThread.store(&renderThread);
+            {
+                std::lock_guard<std::mutex> lk(rtMutex);
+                activeRenderThread = &renderThread;
+            }
             renderThread.Start();
 
             const bool perf = IsPerfEnabled();
@@ -324,7 +333,11 @@ int RunWindowed(const SampleDesc& desc, bool validation, int exitAfter)
                 }
             }
 
-            activeRenderThread.store(nullptr);
+            renderThread.RequestStop();
+            {
+                std::lock_guard<std::mutex> lk(rtMutex);
+                activeRenderThread = nullptr;
+            }
             renderThread.Stop();
             ui = nullptr;
             quit = true;
@@ -338,8 +351,11 @@ int RunWindowed(const SampleDesc& desc, bool validation, int exitAfter)
     }
 
     quit = true;
-    if (auto* rt = activeRenderThread.load()) {
-        rt->Stop();
+    {
+        std::lock_guard<std::mutex> lk(rtMutex);
+        if (activeRenderThread) {
+            activeRenderThread->RequestStop();
+        }
     }
     uiThread.Join();
     device.WaitIdle();

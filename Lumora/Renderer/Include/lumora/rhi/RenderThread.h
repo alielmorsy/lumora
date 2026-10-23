@@ -29,7 +29,6 @@ namespace lumora
         rhi::RHI& device;
         Lumora& ui;
         rhi::SwapchainHandle swapchain{};
-        std::function<void()> wakeUi;
         std::function<rhi::Extent2D()> getWindowExtent;
     };
 
@@ -45,7 +44,10 @@ namespace lumora
         /// Starts the render thread ("LumoraRender" at ThreadPriority::Display).
         bool Start();
 
-        /// Stops the render thread, wakes any waiting threads, and joins.
+        /// Requests stopping without joining; thread-safe, callable from any thread.
+        void RequestStop();
+
+        /// Stops the render thread, wakes any waiting threads, and joins. Called only by owner.
         void Stop();
 
         /// UI thread: waits for the render thread to request a frame. Sets extent to swapchain extent.
@@ -77,7 +79,6 @@ namespace lumora
         Lumora* m_ui = nullptr;
         rhi::SwapchainHandle m_swapchain{};
         rhi::Extent2D m_swapchainExtent{};
-        std::function<void()> m_wakeUi;
         std::function<rhi::Extent2D()> m_getWindowExtent;
 
         platform::Thread m_thread;

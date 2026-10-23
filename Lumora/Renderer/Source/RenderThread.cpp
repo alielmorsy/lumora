@@ -13,7 +13,6 @@ namespace lumora
         : m_device(&desc.device)
         , m_ui(&desc.ui)
         , m_swapchain(desc.swapchain)
-        , m_wakeUi(desc.wakeUi)
         , m_getWindowExtent(desc.getWindowExtent)
         , m_hasSurface(desc.swapchain.IsValid())
     {
@@ -48,20 +47,22 @@ namespace lumora
             platform::ThreadPriority::Display);
     }
 
+    void RenderThread::RequestStop()
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (m_stopping)
+        {
+            return;
+        }
+        m_stopping = true;
+        m_cvRender.notify_all();
+        m_cvUi.notify_all();
+        m_cvSurface.notify_all();
+    }
+
     void RenderThread::Stop()
     {
-        {
-            std::lock_guard<std::mutex> lock(m_mutex);
-            if (m_stopping && !m_running)
-            {
-                return;
-            }
-            m_stopping = true;
-            m_cvRender.notify_all();
-            m_cvUi.notify_all();
-            m_cvSurface.notify_all();
-        }
-
+        RequestStop();
         if (m_thread.Joinable())
         {
             m_thread.Join();
@@ -198,10 +199,6 @@ namespace lumora
                     m_hasFrameRequest = true;
                     m_requestedExtent = m_device->Swapchain().GetSwapchainExtent(m_swapchain);
                     m_swapchainExtent = m_requestedExtent;
-                    if (m_wakeUi)
-                    {
-                        m_wakeUi();
-                    }
                     m_cvUi.notify_all();
                 }
             }
