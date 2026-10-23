@@ -1,6 +1,7 @@
 add_executable(lumora_platform_tests
     WindowGeometryTests.cpp
     DirectoryWatcherTests.cpp
+    ThreadTests.cpp
 )
 
 lumora_defaults(lumora_platform_tests)

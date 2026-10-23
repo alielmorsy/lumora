@@ -10,6 +10,7 @@ if (WIN32)
             Source/Windows/WindowsProgressDialog.cpp
             Source/Windows/XInputGamepads.cpp)
     set(_os
+            Source/OS/Windows/Thread.cpp
             Source/OS/Windows/Process.cpp
             Source/OS/Windows/DynamicLibrary.cpp
             Source/OS/Windows/Environment.cpp
@@ -25,6 +26,7 @@ elseif (ANDROID)
             Source/Android/AndroidClipboard.cpp
             Source/Android/AndroidProgressDialog.cpp)
     set(_os
+            Source/OS/Posix/Thread.cpp
             Source/OS/Posix/Process.cpp
             Source/OS/Posix/DynamicLibrary.cpp
             Source/OS/Posix/Environment.cpp
@@ -43,6 +45,7 @@ elseif (ANDROID)
     endif ()
 else ()
     message(STATUS "lumora_platform: no backend for ${CMAKE_SYSTEM_NAME}, headless (common sources only)")
+    set(_os Source/OS/Posix/Thread.cpp)
 endif ()
 
 add_library(lumora_platform STATIC ${_common} ${_os} ${_windows} ${_android})
