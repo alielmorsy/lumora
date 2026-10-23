@@ -963,6 +963,12 @@ namespace lumora
             PipelineKind lastPipeline{};
             bool haveScissor = false;
             ScissorRect lastScissor{};
+            // Push descriptors stay bound until the pipeline changes; re-push only when the pipeline or a view changes.
+            bool havePushed = false;
+            PipelineKind pushedPipeline{};
+            rhi::TextureViewHandle pushedMask{};
+            rhi::TextureViewHandle pushedContent{};
+            rhi::SamplerHandle pushedSampler{};
             for (const Batch& b : batches)
             {
                 const rhi::PipelineHandle pipe = _impl->pipelines.Get(b.pipeline);
@@ -1015,13 +1021,22 @@ namespace lumora
                             .sampler = valid ? ref.sampler : _impl->linearSampler
                         }
                     };
-                    const std::array<rhi::DescriptorWrite, 2> writes{content, maskWrite};
-                    cmd.PushDescriptors(0, writes);
+                    if (!havePushed || pushedPipeline != b.pipeline || pushedMask != maskView ||
+                        pushedContent != content.imageInfo.view || pushedSampler != content.imageInfo.sampler)
+                    {
+                        const std::array<rhi::DescriptorWrite, 2> writes{content, maskWrite};
+                        cmd.PushDescriptors(0, writes);
+                        pushedContent = content.imageInfo.view;
+                        pushedSampler = content.imageInfo.sampler;
+                    }
                 }
-                else
+                else if (!havePushed || pushedPipeline != b.pipeline || pushedMask != maskView)
                 {
                     cmd.PushDescriptors(0, {&maskWrite, 1});
                 }
+                havePushed = true;
+                pushedPipeline = b.pipeline;
+                pushedMask = maskView;
 
                 if (b.pipeline == PipelineKind::Rect)
                 {

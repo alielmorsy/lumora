@@ -509,11 +509,8 @@ namespace lumora
         }
         else
         {
-            // ponytail: TessellateFill also builds boundary loops we drop; call libtess2 directly if this shows in profiles.
-            const std::vector<svg::FlatContour> contour{{.pts = {points.begin(), points.end()}, .closed = true}};
-            std::vector<Vec2>                   tris;
-            std::vector<svg::FlatContour>       boundary;
-            svg::TessellateFill(contour, svg::FillRule::NonZero, tris, boundary);
+            std::vector<Vec2> tris;
+            svg::TessellatePolygon(points, svg::FillRule::NonZero, tris);
             if (tris.empty())
             {
                 return;

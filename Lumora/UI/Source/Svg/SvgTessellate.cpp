@@ -6,6 +6,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <cstdlib>
 #include <utility>
 
 namespace lumora::svg
@@ -209,6 +210,53 @@ namespace lumora::svg
             }
             tessDeleteTess(tess);
         }
+    }
+
+    void TessellatePolygon(std::span<const Vec2> pts, FillRule rule, std::vector<Vec2>& outTris)
+    {
+        if (pts.size() < 3)
+        {
+            return;
+        }
+        static_assert(sizeof(Vec2) == sizeof(float) * 2);
+        // libtess2's default buckets (256-512 records each) dominate the cost for icon-sized polygons.
+        const int n = static_cast<int>(pts.size());
+        TESSalloc alloc{};
+        alloc.memalloc = [](void*, unsigned int size) { return std::malloc(size); };
+        alloc.memrealloc = [](void*, void* p, unsigned int size) { return std::realloc(p, size); };
+        alloc.memfree = [](void*, void* p) { std::free(p); };
+        alloc.meshEdgeBucketSize = std::max(16, n * 4);
+        alloc.meshVertexBucketSize = std::max(16, n * 2);
+        alloc.meshFaceBucketSize = std::max(8, n);
+        alloc.dictNodeBucketSize = std::max(16, n * 2);
+        alloc.regionBucketSize = std::max(8, n);
+
+        TESStesselator* tess = tessNewTess(&alloc);
+        if (!tess)
+        {
+            return;
+        }
+        tessAddContour(tess, 2, &pts[0].x, sizeof(Vec2), n);
+        const int winding = (rule == FillRule::EvenOdd) ? TESS_WINDING_ODD : TESS_WINDING_NONZERO;
+        if (tessTesselate(tess, winding, TESS_POLYGONS, 3, 2, nullptr))
+        {
+            const TESSreal* verts = tessGetVertices(tess);
+            const TESSindex* elems = tessGetElements(tess);
+            const int count = tessGetElementCount(tess);
+            outTris.reserve(outTris.size() + static_cast<std::size_t>(count) * 3);
+            for (int i = 0; i < count * 3; i += 3)
+            {
+                if (elems[i] == TESS_UNDEF || elems[i + 1] == TESS_UNDEF || elems[i + 2] == TESS_UNDEF)
+                {
+                    continue;
+                }
+                for (int k = 0; k < 3; ++k)
+                {
+                    outTris.push_back({verts[elems[i + k] * 2], verts[elems[i + k] * 2 + 1]});
+                }
+            }
+        }
+        tessDeleteTess(tess);
     }
 
     void SubdivideTris(const std::vector<Vec2>& in, float maxEdge, std::vector<Vec2>& out)

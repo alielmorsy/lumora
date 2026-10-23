@@ -4,6 +4,7 @@
 #include "VulkanRHI.h"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <vector>
 
@@ -423,72 +424,70 @@ void CommandBuffer::PushDescriptors(uint32_t set, std::span<const DescriptorWrit
         return;
     }
 
-    std::vector<VkDescriptorBufferInfo> bufferInfos;
-    std::vector<VkDescriptorImageInfo>  imageInfos;
-    bufferInfos.reserve(writes.size());
-    imageInfos.reserve(writes.size());
+    // Called once per draw by the painter: keep the common case (a few writes) off the heap.
+    constexpr size_t                          kInline = 8;
+    std::array<VkDescriptorBufferInfo, kInline> bufInline{};
+    std::array<VkDescriptorImageInfo, kInline>  imgInline{};
+    std::array<VkWriteDescriptorSet, kInline>   writeInline{};
+    std::vector<VkDescriptorBufferInfo>         bufHeap;
+    std::vector<VkDescriptorImageInfo>          imgHeap;
+    std::vector<VkWriteDescriptorSet>           writeHeap;
+    const size_t                                count = writes.size();
+    VkDescriptorBufferInfo* bufferInfos = bufInline.data();
+    VkDescriptorImageInfo*  imageInfos  = imgInline.data();
+    VkWriteDescriptorSet*   vkWrites    = writeInline.data();
+    if (count > kInline) {
+        bufHeap.resize(count);
+        imgHeap.resize(count);
+        writeHeap.resize(count);
+        bufferInfos = bufHeap.data();
+        imageInfos  = imgHeap.data();
+        vkWrites    = writeHeap.data();
+    }
 
-    struct PendingWrite {
-        size_t               bufIdx = ~0ull;
-        size_t               imgIdx = ~0ull;
-        VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-    };
-    std::vector<PendingWrite> pending;
-    pending.reserve(writes.size());
-
-    for (const auto& w : writes) {
-        PendingWrite pw{};
-        pw.write.dstBinding      = w.binding;
-        pw.write.dstArrayElement = w.arrayElement;
-        pw.write.descriptorCount = 1;
-        pw.write.descriptorType  = detail::ToVk(w.type);
+    for (size_t i = 0; i < count; ++i) {
+        const DescriptorWrite& w  = writes[i];
+        VkWriteDescriptorSet&  vw = vkWrites[i];
+        vw                 = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+        vw.dstBinding      = w.binding;
+        vw.dstArrayElement = w.arrayElement;
+        vw.descriptorCount = 1;
+        vw.descriptorType  = detail::ToVk(w.type);
 
         if (w.type == DescriptorType::UniformBuffer || w.type == DescriptorType::StorageBuffer) {
-            detail::Buffer* b = _rhi->buffers.Get(w.bufferInfo.buffer);
-            VkDescriptorBufferInfo bi{};
-            bi.buffer = b ? b->buffer : VK_NULL_HANDLE;
-            bi.offset = w.bufferInfo.offset;
-            bi.range  = (w.bufferInfo.range == ~0ull) ? VK_WHOLE_SIZE : w.bufferInfo.range;
-            pw.bufIdx = bufferInfos.size();
-            bufferInfos.push_back(bi);
+            detail::Buffer*         b  = _rhi->buffers.Get(w.bufferInfo.buffer);
+            VkDescriptorBufferInfo& bi = bufferInfos[i];
+            bi.buffer                  = b ? b->buffer : VK_NULL_HANDLE;
+            bi.offset                  = w.bufferInfo.offset;
+            bi.range                   = (w.bufferInfo.range == ~0ull) ? VK_WHOLE_SIZE : w.bufferInfo.range;
+            vw.pBufferInfo             = &bi;
         } else if (w.type == DescriptorType::Sampler) {
-            SamplerHandle sh = w.samplerOnly.IsValid() ? w.samplerOnly : w.imageInfo.sampler;
-            detail::Sampler* s = _rhi->samplers.Get(sh);
-            VkDescriptorImageInfo ii{};
-            ii.sampler = s ? s->sampler : VK_NULL_HANDLE;
-            pw.imgIdx  = imageInfos.size();
-            imageInfos.push_back(ii);
+            SamplerHandle          sh = w.samplerOnly.IsValid() ? w.samplerOnly : w.imageInfo.sampler;
+            detail::Sampler*       s  = _rhi->samplers.Get(sh);
+            VkDescriptorImageInfo& ii = imageInfos[i];
+            ii                        = {};
+            ii.sampler                = s ? s->sampler : VK_NULL_HANDLE;
+            vw.pImageInfo             = &ii;
         } else {
             detail::Texture* t = _rhi->textures.Get(w.imageInfo.texture);
             TextureViewHandle vh =
                 w.imageInfo.view.IsValid() ? w.imageInfo.view : (t ? t->defaultView : TextureViewHandle{});
-            detail::TextureView* tv = _rhi->views.Get(vh);
-            VkDescriptorImageInfo ii{};
+            detail::TextureView*   tv = _rhi->views.Get(vh);
+            VkDescriptorImageInfo& ii = imageInfos[i];
+            ii                        = {};
             if (w.type == DescriptorType::CombinedImageSampler) {
                 detail::Sampler* s = _rhi->samplers.Get(w.imageInfo.sampler);
                 ii.sampler         = s ? s->sampler : VK_NULL_HANDLE;
             }
             ii.imageView   = tv ? tv->view : VK_NULL_HANDLE;
             ii.imageLayout = detail::ToVk(w.imageInfo.layout);
-            pw.imgIdx      = imageInfos.size();
-            imageInfos.push_back(ii);
+            vw.pImageInfo  = &ii;
         }
-        pending.push_back(pw);
-    }
-
-    std::vector<VkWriteDescriptorSet> vkWrites;
-    vkWrites.reserve(pending.size());
-    for (auto& pw : pending) {
-        if (pw.bufIdx != ~0ull)
-            pw.write.pBufferInfo = &bufferInfos[pw.bufIdx];
-        if (pw.imgIdx != ~0ull)
-            pw.write.pImageInfo = &imageInfos[pw.imgIdx];
-        vkWrites.push_back(pw.write);
     }
 
     if (layout->push && _rhi->cmdPushDescriptorSet) {
         _rhi->cmdPushDescriptorSet(static_cast<VkCommandBuffer>(_cmd), VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                   p->layout, set, static_cast<uint32_t>(vkWrites.size()), vkWrites.data());
+                                   p->layout, set, static_cast<uint32_t>(count), vkWrites);
         return;
     }
 
@@ -509,10 +508,10 @@ void CommandBuffer::PushDescriptors(uint32_t set, std::span<const DescriptorWrit
         return;
     }
 
-    for (auto& w : vkWrites)
-        w.dstSet = dset;
+    for (size_t i = 0; i < count; ++i)
+        vkWrites[i].dstSet = dset;
 
-    vkUpdateDescriptorSets(_rhi->device, static_cast<uint32_t>(vkWrites.size()), vkWrites.data(), 0, nullptr);
+    vkUpdateDescriptorSets(_rhi->device, static_cast<uint32_t>(count), vkWrites, 0, nullptr);
     vkCmdBindDescriptorSets(static_cast<VkCommandBuffer>(_cmd), VK_PIPELINE_BIND_POINT_GRAPHICS,
                             p->layout, set, 1, &dset, 0, nullptr);
 }

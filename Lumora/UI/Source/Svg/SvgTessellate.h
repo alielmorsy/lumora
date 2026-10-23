@@ -2,6 +2,7 @@
 
 #include "Svg/SvgScene.h"
 
+#include <span>
 #include <vector>
 
 namespace lumora::svg
@@ -13,6 +14,9 @@ namespace lumora::svg
     /// the oriented boundary loops (for the AA feather). Uses libtess2.
     void TessellateFill(const std::vector<FlatContour>& contours, FillRule rule, std::vector<Vec2>& outTris,
                         std::vector<FlatContour>& outBoundary);
+
+    /// Triangles only for one closed polygon: no boundary pass, no contour copy, mesh buckets sized to the input.
+    void TessellatePolygon(std::span<const Vec2> pts, FillRule rule, std::vector<Vec2>& outTris);
 
     /// Subdivide triangles so no edge exceeds `maxEdge` (document space) - for smooth per-vertex
     /// gradient colour across large fills. Writes to `out`.
