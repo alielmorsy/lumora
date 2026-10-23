@@ -65,7 +65,7 @@ namespace lumora
         std::uint32_t paintReplayed = 0;     ///< records pushed from the display list into the Canvas
 
         // reactive
-        std::uint32_t framePasses = 0;            ///< fixed-step passes taken this Tick
+        std::uint32_t framePasses = 0;            ///< frame-callback passes taken this Tick (0 or 1)
         std::uint32_t frameCallbacksInvoked = 0;  ///< OnFrame bodies actually called
         std::uint32_t frameCallbacksAlive = 0;    ///< registered callbacks after the reap
         std::uint32_t frameCallbacksReaped = 0;   ///< dead callbacks compacted away this Tick

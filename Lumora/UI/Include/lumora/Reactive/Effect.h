@@ -15,6 +15,7 @@ namespace lumora
     /// Registers fn to run when the current Owner disposes (LIFO). No-op without an Owner.
     LUMORA_API void OnCleanup(CleanupFn fn);
 
-    /// Registers a per-frame callback (dt in seconds) fired by Tick(). Tied to the current Owner; without one it never fires.
+    /// Registers a per-frame callback fired once per Tick() with the real frame delta in seconds (clamped to 0.1), so it runs at
+    /// the display rate: scale motion by dt, never by call count. Tied to the current Owner; without one it never fires.
     LUMORA_API void OnFrame(FrameFn fn);
 }

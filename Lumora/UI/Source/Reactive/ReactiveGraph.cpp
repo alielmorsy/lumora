@@ -25,17 +25,13 @@ void ReactiveGraph::Tick(float deltaSeconds) {
 
     DrainStructuralEdits(); // pending splices/disposes from the previous frame's dispatch
 
-    // Fixed-timestep
-    constexpr float kFixedStep      = 1.f / 60.f;
-    constexpr float kMaxAccumulator = 0.1f;
-    m_frameAccumulator += deltaSeconds;
-    if (m_frameAccumulator > kMaxAccumulator) {
-        m_frameAccumulator = kMaxAccumulator;
-    }
+    // One pass per frame with the real delta, so motion runs at the display rate; callbacks scale by dt, so speed is rate-independent.
+    // Clamped so a long hitch does not teleport anything.
+    constexpr float kMaxDelta = 0.1f;
+    const float dt = std::min(deltaSeconds, kMaxDelta);
 
     // Indexed, each callback held by value: a callback may register another (Tween, Timeline, Spring), reallocating the vector.
-    while (m_frameAccumulator >= kFixedStep) {
-        m_frameAccumulator -= kFixedStep;
+    if (dt > 0.f) {
         if (m_counters) {
             ++m_counters->framePasses;
         }
@@ -46,7 +42,7 @@ void ReactiveGraph::Tick(float deltaSeconds) {
                 if (m_counters) {
                     ++m_counters->frameCallbacksInvoked;
                 }
-                callback->fn(kFixedStep);
+                callback->fn(dt);
             }
         }
     }

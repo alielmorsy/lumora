@@ -102,6 +102,32 @@ TEST(AnimationTests, SpringFrameRateIndependent) {
     EXPECT_NEAR(a, b, 0.02f);
 }
 
+TEST(AnimationTests, MotionAdvancesOnEveryHighRateFrameAtTheSameSpeed) {
+    const auto run = [](float step, int steps, int* moves) {
+        auto graph = MakeRef<ReactiveGraph>();
+        GraphScope scope(*graph);
+        Owner owner;
+        auto          t = Signal(0.f);
+        Motion<float> m = Tween<float>(t, {.duration = 0.5f});
+        t = 1.f;
+        float last = m.Peek();
+        for (int i = 0; i < steps; ++i) {
+            graph->Tick(step);
+            if (moves && m.Peek() != last) {
+                ++*moves;
+            }
+            last = m.Peek();
+        }
+        return m.Peek();
+    };
+
+    int moves = 0;
+    const float fast = run(1.f / 165.f, 33, &moves); // 0.2 s at 165 Hz
+    const float slow = run(1.f / 60.f, 12, nullptr); // 0.2 s at 60 Hz
+    EXPECT_EQ(moves, 33);
+    EXPECT_NEAR(fast, slow, 0.01f);
+}
+
 TEST(AnimationTests, SpringSurvivesHugeDelta) {
     auto graph = MakeRef<ReactiveGraph>();
     GraphScope scope(*graph);

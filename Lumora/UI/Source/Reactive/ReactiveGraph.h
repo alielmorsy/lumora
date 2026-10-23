@@ -68,7 +68,6 @@ private:
     std::vector<std::function<void()>> m_deferred;
     std::vector<std::function<void()>> m_structuralEdits;
     int m_deferDepth = 0;
-    float m_frameAccumulator = 0.f; // leftover real time between fixed 1/60 s animation steps
     FrameCounters* m_counters = nullptr;
 
     inline static thread_local ReactiveGraph* s_ambient = nullptr;
