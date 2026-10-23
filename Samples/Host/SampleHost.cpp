@@ -1,5 +1,6 @@
 #include "SampleHost.h"
 
+#include <lumora/Debug/FrameCounters.h>
 #include <lumora/MountedApp.h>
 #include <lumora/Text/FontSystem.h>
 
@@ -12,9 +13,11 @@
 #include <lumora/log/Log.h>
 #include <lumora/log/Spdlog.h>
 #include <lumora/platform/SystemMetrics.h>
+#include <lumora/platform/Thread.h>
 #include <lumora/platform/Window.h>
 #include <lumora/rhi/Lumora.h>
 #include <lumora/rhi/RHI.h>
+#include <lumora/rhi/RenderThread.h>
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
@@ -22,9 +25,19 @@
 #include <windows.h>
 #endif
 
+#if defined(__ANDROID__)
+#include <android/log.h>
+#include <sys/system_properties.h>
+#define PERF_PRINT(...) __android_log_print(ANDROID_LOG_INFO, "LumoraPerf", __VA_ARGS__)
+#else
+#define PERF_PRINT(...) (std::printf(__VA_ARGS__), std::printf("\n"), std::fflush(stdout))
+#endif
+
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <fstream>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -50,6 +63,18 @@ int RunHeadless(const SampleDesc& desc, int frames)
 }
 
 #if LUMORA_SAMPLE_GPU
+static bool IsPerfEnabled()
+{
+#if defined(__ANDROID__)
+    char val[PROP_VALUE_MAX]{};
+    __system_property_get("debug.lumora.perf", val);
+    return std::strcmp(val, "1") == 0;
+#else
+    const char* s = std::getenv("LUMORA_PERF");
+    return s && (std::strcmp(s, "1") == 0 || std::strcmp(s, "true") == 0);
+#endif
+}
+
 std::vector<std::byte> ReadFile(const char* path)
 {
     std::ifstream file(path, std::ios::binary | std::ios::ate);
@@ -60,6 +85,13 @@ std::vector<std::byte> ReadFile(const char* path)
     file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
     return bytes;
 }
+
+struct EventInbox
+{
+    std::mutex mutex;
+    std::vector<platform::InputEvent> inputEvents;
+    std::vector<platform::WindowEvent> windowEvents;
+};
 
 int RunWindowed(const SampleDesc& desc, bool validation, int exitAfter)
 {
@@ -105,68 +137,212 @@ int RunWindowed(const SampleDesc& desc, bool validation, int exitAfter)
     sc.extent       = {window->GetWidth(), window->GetHeight()};
     const rhi::SwapchainHandle swapchain = device.Swapchain().CreateSwapchain(sc);
 
-    auto ui = MakeLumora({
-        .rhi         = &device,
-        .spirvLoader = [](std::string_view name) {
-            auto span = lumora::EmbeddedSpirv(name);
-            return std::vector<std::byte>(span.begin(), span.end());
-        },
-        .colorFormat = device.Swapchain().GetSwapchainFormat(swapchain),
-    });
-    ui->SetContentScale(window->GetDpiScale());
+    EventInbox inbox;
+    std::atomic<bool> quit = false;
+    std::atomic<RenderThread*> activeRenderThread = nullptr;
+    std::atomic<uint32_t> windowWidth = static_cast<uint32_t>(desc.width);
+    std::atomic<uint32_t> windowHeight = static_cast<uint32_t>(desc.height);
 
-    const platform::DefaultFontFiles fontFiles = platform::GetDefaultUiFont();
-    auto regular = ReadFile(fontFiles.regular.string().c_str());
-    auto bold    = ReadFile(fontFiles.bold.string().c_str());
-    if (!regular.empty()) {
-        ui->Fonts().RegisterFont(regular, {.family = "Sans"});
-        ui->Fonts().SetDefaultFamily("Sans");
-        if (!bold.empty())
-            ui->Fonts().RegisterFont(bold, {.family = "Sans", .bold = true});
-    } else {
-        LOG_WARN("No system font found at {}", fontFiles.regular.string());
-    }
-
-    auto mounted = ui->Mount(desc.root);
-    if (!desc.css.empty())
-        ui->SetStylesheetSource(desc.css);
-
-    const auto inputSub = window->InputEvents().Subscribe([&](const platform::InputEvent& e) { ui->Dispatch(e); });
-    const auto winSub   = window->Events().Subscribe([&](const platform::WindowEvent& e) {
-        if (e.type == platform::WindowEventType::DpiChanged)
-            ui->SetContentScale(e.dpiScale);
+    const auto inputSub = window->InputEvents().Subscribe([&](const platform::InputEvent& e) {
+        std::lock_guard<std::mutex> lock(inbox.mutex);
+        inbox.inputEvents.push_back(e);
     });
 
-    auto last = std::chrono::steady_clock::now();
-    for (int frame = 0; !window->ShouldClose() && frame != exitAfter; ++frame) {
-        window->PumpEvents();
-        const auto now = std::chrono::steady_clock::now();
-        ui->Update(std::chrono::duration<float>(now - last).count());
-        if (mounted)
-            window->SetTextInputActive(mounted->WantsTextInput());
-        last = now;
-
-        rhi::FrameContext ctx = device.BeginFrame(swapchain);
-        if (ctx.swapchainImage.IsValid()) {
-            const rhi::Extent2D extent = device.Swapchain().GetSwapchainExtent(swapchain);
-            ui->Layout(static_cast<float>(extent.width), static_cast<float>(extent.height));
-            rhi::CommandBuffer& cmd = *ctx.cmd;
-            cmd.TransitionTexture(ctx.swapchainImage, rhi::ImageLayout::Undefined, rhi::ImageLayout::ColorAttachment);
-            ui->Paint(cmd, ctx.frameIndex, device.Resources().GetDefaultView(ctx.swapchainImage), extent,
-                      rhi::Color{0.f, 0.f, 0.f, 1.f});
-            cmd.TransitionTexture(ctx.swapchainImage, rhi::ImageLayout::ColorAttachment, rhi::ImageLayout::PresentSrc);
+    const auto winSub = window->Events().Subscribe([&](const platform::WindowEvent& e) {
+        if (e.type == platform::WindowEventType::Resize) {
+            windowWidth.store(e.width);
+            windowHeight.store(e.height);
         }
-        device.EndFrame(ctx);
-        if (ctx.swapchainOutOfDate)
-            device.Swapchain().RecreateSwapchain(swapchain, {window->GetWidth(), window->GetHeight()});
-        // Nothing presented (minimized / zero-sized surface) means no vsync wait; throttle instead of spinning.
-        if (!ctx.swapchainImage.IsValid())
-            std::this_thread::sleep_for(std::chrono::milliseconds(16));
+        if (e.type == platform::WindowEventType::Close) {
+            quit = true;
+        } else if (e.type == platform::WindowEventType::SurfaceDestroyed) {
+            if (auto* rt = activeRenderThread.load()) {
+                rt->LoseSurface();
+            }
+        } else if (e.type == platform::WindowEventType::SurfaceCreated) {
+            if (auto* rt = activeRenderThread.load()) {
+                const auto curNative = window->GetNativeHandle();
+                rhi::NativeWindowHandles h{
+                    .window = curNative.window,
+                    .instance = curNative.instance,
+                    .kind = curNative.backend == platform::WindowBackend::Android ? rhi::NativeWindowKind::Android : rhi::NativeWindowKind::Win32,
+                };
+                rt->SetSurface(h);
+            }
+        } else {
+            std::lock_guard<std::mutex> lock(inbox.mutex);
+            inbox.windowEvents.push_back(e);
+        }
+    });
+
+    platform::Thread uiThread;
+    uiThread.Start(
+        "LumoraUI",
+        [&] {
+            auto ui = MakeLumora({
+                .rhi         = &device,
+                .spirvLoader = [](std::string_view name) {
+                    auto span = lumora::EmbeddedSpirv(name);
+                    return std::vector<std::byte>(span.begin(), span.end());
+                },
+                .colorFormat = device.Swapchain().GetSwapchainFormat(swapchain),
+            });
+            ui->SetContentScale(window->GetDpiScale());
+
+            const platform::DefaultFontFiles fontFiles = platform::GetDefaultUiFont();
+            auto regular = ReadFile(fontFiles.regular.string().c_str());
+            auto bold    = ReadFile(fontFiles.bold.string().c_str());
+            if (!regular.empty()) {
+                ui->Fonts().RegisterFont(regular, {.family = "Sans"});
+                ui->Fonts().SetDefaultFamily("Sans");
+                if (!bold.empty())
+                    ui->Fonts().RegisterFont(bold, {.family = "Sans", .bold = true});
+            } else {
+                LOG_WARN("No system font found at {}", fontFiles.regular.string());
+            }
+
+            auto mounted = ui->Mount(desc.root);
+            if (!desc.css.empty())
+                ui->SetStylesheetSource(desc.css);
+
+            RenderThread renderThread(RenderThreadDesc{
+                .device = device,
+                .ui = *ui,
+                .swapchain = swapchain,
+                .wakeUi = [&] { window->Wake(); },
+                .getWindowExtent = [&] { return rhi::Extent2D{windowWidth.load(), windowHeight.load()}; },
+            });
+            activeRenderThread.store(&renderThread);
+            renderThread.Start();
+
+            const bool perf = IsPerfEnabled();
+            using Clock = std::chrono::steady_clock;
+            auto ms = [](Clock::time_point a, Clock::time_point b) {
+                return std::chrono::duration<double, std::milli>(b - a).count();
+            };
+
+            double tUiWait = 0.0, tUiWork = 0.0;
+            std::uint64_t cEmitVisited = 0, cEmitRecorded = 0, cReplayed = 0, cEffects = 0, cFrameCb = 0,
+                          cCascade = 0, cTextMeasure = 0, cGlyph = 0, cSolve = 0, cRefreshDirty = 0,
+                          cLayoutRuns = 0, cIdleBails = 0, cReused = 0, cLayers = 0, cBytes = 0;
+            int perfFrameCount = 0;
+            constexpr int kPerfWindow = 300;
+
+            auto last = Clock::now();
+            int frameCount = 0;
+
+            while (!quit.load()) {
+                const auto tWaitStart = Clock::now();
+                rhi::Extent2D extent{};
+                if (!renderThread.WaitFrameRequest(extent)) {
+                    break;
+                }
+                const auto tWorkStart = Clock::now();
+
+                std::vector<platform::InputEvent> curInput;
+                std::vector<platform::WindowEvent> curWin;
+                {
+                    std::lock_guard<std::mutex> lock(inbox.mutex);
+                    curInput.swap(inbox.inputEvents);
+                    curWin.swap(inbox.windowEvents);
+                }
+                for (const auto& in : curInput) {
+                    ui->Dispatch(in);
+                }
+                for (const auto& w : curWin) {
+                    if (w.type == platform::WindowEventType::DpiChanged) {
+                        ui->SetContentScale(w.dpiScale);
+                    }
+                }
+
+                const auto now = Clock::now();
+                const float dt = std::chrono::duration<float>(now - last).count();
+                last = now;
+
+                ui->Update(dt);
+                if (mounted) {
+                    window->SetTextInputActive(mounted->WantsTextInput());
+                }
+                ui->Layout(static_cast<float>(extent.width), static_cast<float>(extent.height));
+
+                FramePacket& packet = renderThread.Packet();
+                ui->RecordFrame(packet, extent);
+                renderThread.Submit();
+
+                const auto tWorkEnd = Clock::now();
+
+                if (perf) {
+                    tUiWait += ms(tWaitStart, tWorkStart);
+                    tUiWork += ms(tWorkStart, tWorkEnd);
+                    if (mounted) {
+                        const FrameCounters& c = mounted->Counters();
+                        cEmitVisited += c.emitVisited;
+                        cEmitRecorded += c.emitRecorded;
+                        cReplayed += c.paintReplayed;
+                        cEffects += c.effectRuns;
+                        cFrameCb += c.frameCallbacksInvoked;
+                        cCascade += c.cascadeCalls;
+                        cTextMeasure += c.textMeasureCalls;
+                        cGlyph += c.glyphCacheCalls;
+                        cSolve += c.solveCalls;
+                        cRefreshDirty += c.refreshDirty;
+                        cLayoutRuns += c.layoutRuns;
+                        cIdleBails += c.layoutIdleBails;
+                        cReused += c.emitReused;
+                        cLayers += c.emitLayers;
+                        cBytes += c.paintRecordedBytes;
+                    }
+                    if (++perfFrameCount == kPerfWindow) {
+                        const RenderStats rStats = renderThread.TakeRenderStats();
+                        const double n = kPerfWindow;
+                        const double rendN = rStats.frameCount > 0 ? static_cast<double>(rStats.frameCount) : n;
+                        PERF_PRINT("PERF ms/frame: ui-wait %.3f ui-work %.3f render-acquire %.3f render-wait %.3f render-frame %.3f present %.3f",
+                                   tUiWait / n, tUiWork / n,
+                                   rStats.acquireMs / rendN, rStats.waitPacketMs / rendN,
+                                   rStats.renderFrameMs / rendN, rStats.presentMs / rendN);
+                        PERF_PRINT("PERF per-frame: emitVisited %.0f emitRecorded %.0f emitReused %.0f layers %.0f replayed %.0f bytes %.0f | effects %.0f onFrame %.0f cascades %.0f | textMeasure %.0f glyphCache %.0f | layoutRuns %.1f idleBails %.1f refreshDirty %.0f solves %.1f",
+                                   static_cast<double>(cEmitVisited) / n, static_cast<double>(cEmitRecorded) / n,
+                                   static_cast<double>(cReused) / n, static_cast<double>(cLayers) / n,
+                                   static_cast<double>(cReplayed) / n, static_cast<double>(cBytes) / n,
+                                   static_cast<double>(cEffects) / n, static_cast<double>(cFrameCb) / n,
+                                   static_cast<double>(cCascade) / n, static_cast<double>(cTextMeasure) / n,
+                                   static_cast<double>(cGlyph) / n, static_cast<double>(cLayoutRuns) / n,
+                                   static_cast<double>(cIdleBails) / n, static_cast<double>(cRefreshDirty) / n,
+                                   static_cast<double>(cSolve) / n);
+                        tUiWait = tUiWork = 0.0;
+                        cEmitVisited = cEmitRecorded = cReplayed = cEffects = cFrameCb = cCascade = cTextMeasure = cGlyph = cSolve = cRefreshDirty = cLayoutRuns =
+                            cIdleBails = cReused = cLayers = cBytes = 0;
+                        perfFrameCount = 0;
+                    }
+                }
+
+                ++frameCount;
+                if (exitAfter > 0 && frameCount >= exitAfter) {
+                    quit = true;
+                    window->Wake();
+                    break;
+                }
+            }
+
+            activeRenderThread.store(nullptr);
+            renderThread.Stop();
+            ui = nullptr;
+            quit = true;
+            window->Wake();
+        },
+        platform::ThreadPriority::High);
+
+    while (!quit.load() && !window->ShouldClose()) {
+        window->WaitEvents();
+        window->PumpEvents();
     }
 
+    quit = true;
+    if (auto* rt = activeRenderThread.load()) {
+        rt->Stop();
+    }
+    uiThread.Join();
     device.WaitIdle();
-    ui = nullptr;
-    device.Swapchain().DestroySwapchain(swapchain);
     device.Shutdown();
     return 0;
 }

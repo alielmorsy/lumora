@@ -9,6 +9,7 @@ add_library(lumora_renderer STATIC
     Source/FrameRings.cpp
     Source/LumoraPipelines.cpp
     Source/RHIImageProvider.cpp
+    Source/RenderThread.cpp
 )
 add_library(lumora::renderer ALIAS lumora_renderer)
 lumora_defaults(lumora_renderer)
