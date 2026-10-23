@@ -18,7 +18,11 @@ target_link_libraries(lumora_rhi PRIVATE lumora::log)
 if (EMSCRIPTEN)
     # webgpu.h for compiling; executables linking lumora_rhi get the JS side from the same flag.
     target_compile_options(lumora_rhi PUBLIC --use-port=emdawnwebgpu)
-    target_link_options(lumora_rhi PUBLIC --use-port=emdawnwebgpu)
+    # emscan-deps ignores --use-port and so cannot find webgpu.h; nothing here uses modules.
+    set_target_properties(lumora_rhi PROPERTIES CXX_SCAN_FOR_MODULES OFF)
+    # ASYNCIFY lets RHI::Init block on wgpuInstanceWaitAny for the adapter and device. JSPI would be cheaper but
+    # Safari, Firefox and the emsdk node used by ctest lack it.
+    target_link_options(lumora_rhi PUBLIC --use-port=emdawnwebgpu -sASYNCIFY)
     return()
 endif ()
 
