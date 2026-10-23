@@ -25,6 +25,17 @@ function(lumora_add_sample name)
         set_target_properties(${name} PROPERTIES SUFFIX ".html")
         target_link_libraries(${name} PRIVATE lumora_sample_host)
         lumora_defaults(${name})
+        set(_shell "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/Host/web/shell.html")
+        set(_font "${LUMORA_ROOT_DIR}/ThirdParty/harfbuzz/perf/fonts/Roboto-Regular.ttf")
+        target_link_options(${name} PRIVATE
+            "SHELL:--shell-file ${_shell}"
+            -sALLOW_MEMORY_GROWTH=1
+            -sEXIT_RUNTIME=0
+            "SHELL:--preload-file ${_font}@/fonts/Roboto-Regular.ttf")
+        set_property(TARGET ${name} APPEND PROPERTY LINK_DEPENDS "${_shell}" "${_font}")
+        if (IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets")
+            target_link_options(${name} PRIVATE "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/assets@/assets")
+        endif ()
     else ()
         add_executable(${name} ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/Host/SampleEntry.cpp ${ARGN})
         target_link_libraries(${name} PRIVATE lumora_sample_host)
