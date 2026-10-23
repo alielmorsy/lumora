@@ -281,10 +281,8 @@ namespace lumora
                     m_accumStats.presentMs += presentMs;
                 }
 
-                if (m_swapchainExtent.width == 0 || m_swapchainExtent.height == 0)
-                {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(16));
-                }
+                // Nothing presented (minimized / zero-sized surface / timeout); throttle instead of spinning.
+                std::this_thread::sleep_for(std::chrono::milliseconds(16));
             }
 
             if (ctx.swapchainOutOfDate)
