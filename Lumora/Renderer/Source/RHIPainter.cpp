@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <cstring>
 #include <limits>
+#include <mutex>
 #include <optional>
 #include <span>
 #include <utility>
@@ -328,6 +329,7 @@ namespace lumora
                     if (im.texture.IsValid()) m_rhi.Resources().Destroy(im.texture);
             }
 
+            std::mutex mutex; // guards entries: ids are allocated on the UI thread, views read while rendering
             std::vector<Image> entries; // ImageHandle.id - 1 = index
 
         private:
@@ -343,6 +345,9 @@ namespace lumora
         };
 
         std::vector<DeferredFree> deferred;
+
+        std::mutex opsMutex;
+        PainterOps pendingOps;
 
         rhi::BufferHandle quadIndexBuffer{};
         std::uint32_t quadIndexCapacity = 0; // number of uint32 indices
@@ -383,7 +388,12 @@ namespace lumora
 
         TextureRef ImageRef(ImageHandle image) override
         {
-            if (!images || !image.Valid() || image.id > images->entries.size())
+            if (!images || !image.Valid())
+            {
+                return {};
+            }
+            std::lock_guard lock(images->mutex);
+            if (image.id > images->entries.size())
             {
                 return {};
             }
@@ -567,6 +577,12 @@ namespace lumora
         {
             return;
         }
+        // Queued frees go through the deferred list below; queued uploads are dropped.
+        PainterOps ops;
+        TakePendingOps(ops);
+        ops.uploads.clear();
+        ApplyOps(ops);
+
         rhi::RHIResources& res = _impl->rhi->Resources();
         for (Impl::DeferredFree& d : _impl->deferred)
         {
@@ -615,20 +631,24 @@ namespace lumora
         return _impl->pipelines.Create(*_impl->rhi, spirvDir, colorFormat, loader);
     }
 
-    void RHIPainter::SyncGlyphAtlas(AtlasKind kind, const AtlasView& view)
+    void RHIPainter::SyncGlyphAtlas(AtlasKind kind, const AtlasDelta& delta)
     {
-        Impl::Plane& plane = _impl->PlaneFor(kind);
-        if (view.pixels == nullptr || view.width <= 0 || view.height <= 0)
+        if (delta.version == 0 || delta.width <= 0 || delta.height <= 0 || delta.y0 < 0 || delta.y1 <= delta.y0 ||
+            delta.y1 > delta.height)
         {
             return;
         }
-        if (plane.version == view.version)
+        Impl::Plane& plane = _impl->PlaneFor(kind);
+        const auto w = static_cast<std::uint32_t>(delta.width);
+        const auto h = static_cast<std::uint32_t>(delta.height);
+        const auto rows = static_cast<std::uint32_t>(delta.y1 - delta.y0);
+        const std::size_t bytes = static_cast<std::size_t>(w) * rows * BytesPerPixel(delta.format);
+        if (delta.rows.size() != bytes)
         {
-            return; // version-gated: nothing changed
+            LOG_ERROR("glyph atlas delta has {} bytes, expected {}", delta.rows.size(), bytes);
+            return;
         }
 
-        const auto w = static_cast<std::uint32_t>(view.width);
-        const auto h = static_cast<std::uint32_t>(view.height);
         rhi::RHIResources& res = _impl->rhi->Resources();
         bool recreated = false;
         if (!plane.texture.IsValid() || plane.width != w || plane.height != h)
@@ -640,7 +660,7 @@ namespace lumora
             plane.texture = res.CreateTexture({
                 .type = rhi::TextureType::e2D,
                 .extent = {w, h, 1},
-                .format = FormatOf(view.format),
+                .format = FormatOf(delta.format),
                 .usage = rhi::TextureUsage::Sampled | rhi::TextureUsage::TransferDst,
                 .debugName = kind == AtlasKind::Coverage
                                  ? "Lumora.AtlasCoverage"
@@ -650,96 +670,140 @@ namespace lumora
             plane.width = w;
             plane.height = h;
             recreated = true;
+            if (rows != h)
+            {
+                LOG_WARN("glyph atlas recreated from a partial delta (rows {}..{} of {}); was a frame packet skipped?",
+                         delta.y0, delta.y1, h);
+            }
         }
 
-        const std::size_t bpp = BytesPerPixel(view.format);
         rhi::UploadRequest req{};
         req.dstTexture = plane.texture;
-        // Upload only changed full-width rows when the size is unchanged and the dirty range is a proper subset; a new
-        // texture, or an empty range on a version bump, takes the whole plane.
-        const bool partial = !recreated && view.dirtyY1 > view.dirtyY0 &&
-            (view.dirtyY0 > 0 || view.dirtyY1 < view.height);
-        if (partial)
-        {
-            const auto rows = static_cast<std::uint32_t>(view.dirtyY1 - view.dirtyY0);
-            req.data = view.pixels + static_cast<std::size_t>(view.dirtyY0) * view.width * bpp;
-            req.size = static_cast<std::size_t>(w) * rows * bpp;
-            req.textureRegion.offset = {0, view.dirtyY0, 0};
-            req.textureRegion.extent = {w, rows, 1};
-        }
-        else
-        {
-            req.data = view.pixels;
-            req.size = static_cast<std::size_t>(w) * h * bpp;
-            req.textureRegion.extent = {w, h, 1};
-        }
+        req.data = delta.rows.data();
+        req.size = delta.rows.size();
+        req.textureRegion.offset = {0, delta.y0, 0};
+        req.textureRegion.extent = {w, rows, 1};
         if (recreated) _impl->rhi->Uploads().UploadBlocking({&req, 1});
         else _impl->rhi->Uploads().UpdateBlocking({&req, 1});
 
-        plane.version = view.version;
+        plane.version = delta.version;
     }
 
     ImageHandle RHIPainter::UploadTexture(std::span<const std::byte> pixels, std::uint32_t width,
                                           std::uint32_t height, AtlasFormat format)
     {
-        if (width == 0 || height == 0)
+        if (width == 0 || height == 0 || !_impl->images)
         {
             return {};
         }
-        rhi::RHIResources& res = _impl->rhi->Resources();
-        const rhi::TextureHandle tex = res.CreateTexture({
-            .type = rhi::TextureType::e2D,
-            .extent = {width, height, 1},
-            .format = FormatOf(format),
-            .usage = rhi::TextureUsage::Sampled | rhi::TextureUsage::TransferDst,
-            .debugName = "Lumora.Image"
-        });
-        const rhi::TextureViewHandle view = res.GetDefaultView(tex);
-
-        if (!pixels.empty())
+        std::uint64_t id = 0;
         {
-            rhi::UploadRequest req{};
-            req.dstTexture = tex;
-            req.data = pixels.data();
-            req.size = pixels.size_bytes();
-            req.textureRegion.extent = {width, height, 1};
-            _impl->rhi->Uploads().UploadBlocking({&req, 1});
+            std::lock_guard lock(_impl->images->mutex);
+            _impl->images->entries.emplace_back();
+            id = _impl->images->entries.size();
         }
-
-        _impl->images->entries.push_back({tex, view});
-        return ImageHandle{
-            static_cast<std::uint64_t>(_impl->images->entries.size()), static_cast<float>(width),
-            static_cast<float>(height)
-        };
+        {
+            std::lock_guard lock(_impl->opsMutex);
+            _impl->pendingOps.uploads.push_back(
+                {id, width, height, format, std::vector<std::byte>(pixels.begin(), pixels.end())});
+        }
+        return ImageHandle{id, static_cast<float>(width), static_cast<float>(height)};
     }
 
     void RHIPainter::FreeTexture(ImageHandle image)
     {
-        if (!_impl->images || !image.Valid() || image.id > _impl->images->entries.size())
+        if (!image.Valid())
         {
             return;
         }
-        Impl::Image& im = _impl->images->entries[image.id - 1];
-        if (im.texture.IsValid())
+        std::lock_guard lock(_impl->opsMutex);
+        _impl->pendingOps.frees.push_back(image.id);
+    }
+
+    void RHIPainter::TakePendingOps(PainterOps& out)
+    {
+        std::lock_guard lock(_impl->opsMutex);
+        PainterOps& p = _impl->pendingOps;
+        if (out.Empty())
         {
-            _impl->deferred.push_back({_impl->frameCounter, im.texture});
+            std::swap(out, p);
+            return;
         }
-        im = {};
+        for (PainterOps::Upload& u : p.uploads)
+        {
+            out.uploads.push_back(std::move(u));
+        }
+        out.frees.insert(out.frees.end(), p.frees.begin(), p.frees.end());
+        p.uploads.clear();
+        p.frees.clear();
+    }
+
+    void RHIPainter::ApplyOps(PainterOps& ops)
+    {
+        if (_impl->rhi && _impl->images)
+        {
+            rhi::RHIResources& res = _impl->rhi->Resources();
+            Impl::ImageTable& table = *_impl->images;
+            for (const PainterOps::Upload& u : ops.uploads)
+            {
+                const rhi::TextureHandle tex = res.CreateTexture({
+                    .type = rhi::TextureType::e2D,
+                    .extent = {u.width, u.height, 1},
+                    .format = FormatOf(u.format),
+                    .usage = rhi::TextureUsage::Sampled | rhi::TextureUsage::TransferDst,
+                    .debugName = "Lumora.Image"
+                });
+                const rhi::TextureViewHandle view = res.GetDefaultView(tex);
+                if (!u.pixels.empty())
+                {
+                    rhi::UploadRequest req{};
+                    req.dstTexture = tex;
+                    req.data = u.pixels.data();
+                    req.size = u.pixels.size();
+                    req.textureRegion.extent = {u.width, u.height, 1};
+                    _impl->rhi->Uploads().UploadBlocking({&req, 1});
+                }
+                std::lock_guard lock(table.mutex);
+                table.entries[u.id - 1] = {tex, view};
+            }
+            for (const std::uint64_t id : ops.frees)
+            {
+                std::lock_guard lock(table.mutex);
+                if (id == 0 || id > table.entries.size())
+                {
+                    continue;
+                }
+                Impl::Image& im = table.entries[id - 1];
+                if (im.texture.IsValid())
+                {
+                    _impl->deferred.push_back({_impl->frameCounter, im.texture});
+                }
+                im = {};
+            }
+        }
+        ops.uploads.clear();
+        ops.frees.clear();
     }
 
     ImageHandle RHIPainter::RegisterExternalTexture(rhi::TextureViewHandle view, std::uint32_t width,
                                                     std::uint32_t height)
     {
-        if (!view.IsValid() || width == 0 || height == 0)
+        if (!view.IsValid() || width == 0 || height == 0 || !_impl->images)
         {
             return {};
         }
         // Invalid texture handle -> the slot borrows the view; FreeTexture won't destroy it.
+        std::lock_guard lock(_impl->images->mutex);
         _impl->images->entries.push_back({rhi::TextureHandle{}, view});
         return ImageHandle{
             static_cast<std::uint64_t>(_impl->images->entries.size()), static_cast<float>(width),
             static_cast<float>(height)
         };
+    }
+
+    rhi::TextureViewHandle RHIPainter::ResolveImage(ImageHandle image) const
+    {
+        return _impl->ImageRef(image).view;
     }
 
     void RHIPainter::ShareImagesWith(RHIPainter& owner)

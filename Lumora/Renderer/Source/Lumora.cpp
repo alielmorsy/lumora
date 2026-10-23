@@ -290,58 +290,53 @@ namespace lumora
         {
             return;
         }
+        RecordFrame(m_syncPacket, extent);
+        RenderFrame(m_syncPacket, cmd, frameIndex, target, extent, clear);
+    }
 
+    void Lumora::RecordFrame(FramePacket& out, rhi::Extent2D extent)
+    {
         if (m_scaleDirty)
         {
             TIMER_START(t0);
             NullCanvas warm;
             PaintInto(warm);
             m_scaleDirty = false;
-            TIMER_LOG_DEBUG("Paint::WarmAtlas {:.3f} ms", TIMER_MS(t0));
+            TIMER_LOG_DEBUG("RecordFrame::WarmAtlas {:.3f} ms", TIMER_MS(t0));
         }
 
+        TIMER_START(t1);
+        const float invScale = m_contentScale > 0.f ? 1.f / m_contentScale : 1.f;
+        m_surface = Vec2{static_cast<float>(extent.width) * invScale, static_cast<float>(extent.height) * invScale};
+
+        // Whole-frame skip: every app's retained recording is current and no host overlay is drawing, so the render side
+        // re-presents last frame's geometry. Apps are told so their counters describe a real frame.
+        const bool overlays = m_debugOverlay || m_perfOverlay;
+        bool wanted = overlays;
+        if (!overlays)
         {
-            TIMER_START(t0);
-            m_painter.SyncGlyphAtlas(AtlasKind::Coverage, m_measurer->Atlas(AtlasKind::Coverage));
-            m_painter.SyncGlyphAtlas(AtlasKind::Color, m_measurer->Atlas(AtlasKind::Color));
-            TIMER_LOG_DEBUG("Paint::SyncGlyphAtlas {:.3f} ms", TIMER_MS(t0));
+            for (auto& app : m_apps)
+            {
+                wanted = app->WantsRepaint() || wanted;
+            }
         }
-
+        out.list.Clear();
+        out.reuse = !wanted;
+        if (out.reuse)
         {
-            TIMER_START(t0);
-            Canvas& canvas = m_painter.BeginFrame(cmd, frameIndex, target, extent, clear);
-            TIMER_LOG_DEBUG("Paint::BeginFrame {:.3f} ms", TIMER_MS(t0));
-
-            TIMER_START(t1);
-            // Whole-frame skip: every app's retained recording is current and no host overlay is drawing, so last frame's
-            // geometry is submitted as-is. Apps are told so their counters describe a real frame.
-            const bool overlays = m_debugOverlay || m_perfOverlay;
-            bool reused = false;
-            if (!overlays)
+            for (auto& app : m_apps)
             {
-                bool wanted = false;
-                for (auto& app : m_apps)
-                {
-                    wanted = app->WantsRepaint() || wanted;
-                }
-                if (!wanted && canvas.ReuseFrame())
-                {
-                    for (auto& app : m_apps)
-                    {
-                        app->NoteFrameReused();
-                    }
-                    reused = true;
-                }
+                app->NoteFrameReused();
             }
-            if (!reused)
+        }
+        else
+        {
+            for (auto& app : m_apps)
             {
-                PaintInto(canvas);
+                app->RecordInto(out.list);
             }
-            TIMER_LOG_DEBUG("Paint::PaintInto {:.3f} ms", TIMER_MS(t1));
-
 #if 1
-            const float invScale = m_contentScale > 0.f ? 1.f / m_contentScale : 1.f;
-            m_surface = Vec2{static_cast<float>(extent.width) * invScale, static_cast<float>(extent.height) * invScale};
+            DisplayListCanvas canvas(out.list);
             if (m_perfOverlay)
             {
                 m_perfStats.styleMs = 0.f;
@@ -357,27 +352,84 @@ namespace lumora
             }
             if (m_debugOverlay)
             {
-                TIMER_START(tDbg);
                 for (auto& app : m_apps)
                 {
                     app->PaintDebugOverlay(canvas, m_surface, m_debugFlags);
                 }
                 const DebugOverlayFlags hovered = HitTestDebugControls(m_surface, m_pointerPos);
                 PaintDebugControls(canvas, m_measurer, m_surface, m_debugFlags, hovered);
-                TIMER_LOG_DEBUG("Paint::DebugOverlay {:.3f} ms", TIMER_MS(tDbg));
             }
             if (m_perfOverlay)
             {
-                TIMER_START(tPerf);
                 PaintPerfOverlay(canvas, m_measurer, m_surface, m_perfStats);
-                TIMER_LOG_DEBUG("Paint::PerfOverlay {:.3f} ms", TIMER_MS(tPerf));
             }
 #endif
-
-            TIMER_START(tEnd);
-            m_painter.EndFrame();
-            TIMER_LOG_DEBUG("Paint::EndFrame {:.3f} ms", TIMER_MS(tEnd));
         }
+        TIMER_LOG_DEBUG("RecordFrame::Record {:.3f} ms", TIMER_MS(t1));
+
+        out.contentScale = m_contentScale;
+        out.extent = extent;
+        out.seq = ++m_frameSeq;
+
+        // After recording, so glyphs rasterized while painting ride this packet. Atlas() consumes the dirty span: once per plane.
+        for (int k = 0; k < 2; ++k)
+        {
+            const AtlasView view = m_measurer->Atlas(k == 0 ? AtlasKind::Coverage : AtlasKind::Color);
+            AtlasDelta& d = out.atlas[k];
+            SentAtlas& sent = m_sentAtlas[k];
+            d.version = 0;
+            if (view.pixels == nullptr || view.width <= 0 || view.height <= 0 || view.version == sent.version)
+            {
+                continue;
+            }
+            const bool whole = view.width != sent.width || view.height != sent.height || view.dirtyY1 <= view.dirtyY0;
+            d.version = view.version;
+            d.width = view.width;
+            d.height = view.height;
+            d.format = view.format;
+            d.y0 = whole ? 0 : view.dirtyY0;
+            d.y1 = whole ? view.height : view.dirtyY1;
+            const std::size_t stride = static_cast<std::size_t>(view.width) * (view.format == AtlasFormat::R8 ? 1u : 4u);
+            d.rows.assign(view.pixels + static_cast<std::size_t>(d.y0) * stride, view.pixels + static_cast<std::size_t>(d.y1) * stride);
+            sent = {view.version, view.width, view.height};
+        }
+
+        m_painter.TakePendingOps(out.ops);
+    }
+
+    void Lumora::RenderFrame(FramePacket& in, rhi::CommandBuffer& cmd, std::uint32_t frameIndex,
+                             rhi::TextureViewHandle target, rhi::Extent2D extent, std::optional<rhi::Color> clear)
+    {
+        if (!m_rhi)
+        {
+            return;
+        }
+
+        TIMER_START(t0);
+        m_painter.SetContentScale(in.contentScale);
+        m_painter.ApplyOps(in.ops);
+        m_painter.SyncGlyphAtlas(AtlasKind::Coverage, in.atlas[0]);
+        m_painter.SyncGlyphAtlas(AtlasKind::Color, in.atlas[1]);
+        in.atlas[0].version = 0;
+        in.atlas[1].version = 0;
+        TIMER_LOG_DEBUG("RenderFrame::Uploads {:.3f} ms", TIMER_MS(t0));
+
+        TIMER_START(t1);
+        Canvas& canvas = m_painter.BeginFrame(cmd, frameIndex, target, extent, clear);
+        if (in.reuse)
+        {
+            if (!canvas.ReuseFrame())
+            {
+                m_lastList.Replay(canvas, nullptr);
+            }
+        }
+        else
+        {
+            m_lastList.Swap(in.list);
+            m_lastList.Replay(canvas, nullptr);
+        }
+        m_painter.EndFrame();
+        TIMER_LOG_DEBUG("RenderFrame::Draw {:.3f} ms", TIMER_MS(t1));
     }
 
     void Lumora::SetContentScale(float scale)
@@ -387,8 +439,7 @@ namespace lumora
         {
             return;
         }
-        m_contentScale = s;
-        m_painter.SetContentScale(s);
+        m_contentScale = s; // reaches the painter through the next packet
         if (m_measurer)
         {
             m_measurer->SetContentScale(s);

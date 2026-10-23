@@ -17,6 +17,7 @@
 namespace lumora {
 
 class Canvas;
+class DisplayList;
 class TextMeasurer;
 class Clipboard;
 class MenuBarController;
@@ -83,6 +84,10 @@ public:
     /// Emit the tree's geometry onto `canvas`; the caller brackets the frame. Under the default PaintReuse::Subtree it is
     /// incremental: clean subtrees are republished from last frame's recording and a frame with no dirt is re-presented.
     void Paint(Canvas& canvas);
+
+    /// Same decisions as Paint, but appends this frame's recording (plus the focus ring) to `out` instead of drawing; the
+    /// runtime replays the whole frame list later. paintReplayed then counts the records appended.
+    void RecordInto(DisplayList& out);
 
     /// Whether this app would draw anything different from last frame. False means its retained recording is current, so a
     /// host may skip the frame (Canvas::ReuseFrame); only sound when NO app on the canvas has anything to add. Cheap, non-destructive.
