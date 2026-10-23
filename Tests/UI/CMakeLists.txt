@@ -18,6 +18,10 @@ lumora_add_test(lumora_tests SOURCES
     DockDetachTests.cpp
 )
 
+lumora_add_test(lumora_text_tests SOURCES TextLayoutTests.cpp LINK lumora::text)
+target_compile_definitions(lumora_text_tests PRIVATE
+    LUMORA_TEST_FONT="${LUMORA_ROOT_DIR}/ThirdParty/harfbuzz/perf/fonts/Roboto-Regular.ttf")
+
 lumora_add_test(lumora_style_tests SOURCES
     StyleParserTests.cpp
     StyleMatchTests.cpp
