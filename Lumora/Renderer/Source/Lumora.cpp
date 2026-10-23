@@ -393,7 +393,8 @@ namespace lumora
             d.y0 = whole ? 0 : view.dirtyY0;
             d.y1 = whole ? view.height : view.dirtyY1;
             const std::size_t stride = static_cast<std::size_t>(view.width) * (view.format == AtlasFormat::R8 ? 1u : 4u);
-            d.rows.assign(view.pixels + static_cast<std::size_t>(d.y0) * stride, view.pixels + static_cast<std::size_t>(d.y1) * stride);
+            d.rows.assign(view.pixels + static_cast<std::size_t>(d.y0) * stride,
+                          view.pixels + static_cast<std::size_t>(d.y1) * stride);
             sent = {view.version, view.width, view.height};
         }
 
