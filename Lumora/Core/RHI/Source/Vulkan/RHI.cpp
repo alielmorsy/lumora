@@ -511,10 +511,15 @@ FrameContext RHI::BeginFrame(SwapchainHandle swapchain)
     ctx.cmd        = f.recorder.get();
 
     if (detail::Swapchain* sc = n.swapchains.Get(swapchain)) {
-        const VkResult r = vkAcquireNextImageKHR(n.device, sc->swapchain, UINT64_MAX, f.acquired, VK_NULL_HANDLE,
+        constexpr uint64_t kAcquireTimeoutNs = 100'000'000ULL;
+        const VkResult r = vkAcquireNextImageKHR(n.device, sc->swapchain, kAcquireTimeoutNs, f.acquired, VK_NULL_HANDLE,
                                                  &sc->imageIndex);
         if (r == VK_ERROR_OUT_OF_DATE_KHR) {
             ctx.swapchainOutOfDate = true;
+        } else if (r == VK_ERROR_SURFACE_LOST_KHR) {
+            ctx.swapchainOutOfDate = true;
+        } else if (r == VK_TIMEOUT || r == VK_NOT_READY) {
+            // No image this frame.
         } else {
             if (r != VK_SUCCESS && r != VK_SUBOPTIMAL_KHR)
                 LUMORA_VK_CHECK(r);
@@ -559,7 +564,7 @@ void RHI::EndFrame(FrameContext& ctx)
         pi.pSwapchains        = &sc->swapchain;
         pi.pImageIndices      = &sc->imageIndex;
         const VkResult r      = vkQueuePresentKHR(n.queue, &pi);
-        if (r == VK_ERROR_OUT_OF_DATE_KHR || r == VK_SUBOPTIMAL_KHR)
+        if (r == VK_ERROR_OUT_OF_DATE_KHR || r == VK_SUBOPTIMAL_KHR || r == VK_ERROR_SURFACE_LOST_KHR)
             ctx.swapchainOutOfDate = true;
         else
             LUMORA_VK_CHECK(r);
