@@ -1,0 +1,8 @@
+{
+  "name": "lumora-js",
+  "private": true,
+  "workspaces": ["packages/*", "examples/*"],
+  "scripts": {
+    "test": "npm test --workspaces --if-present"
+  }
+}
