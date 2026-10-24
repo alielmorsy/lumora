@@ -21,6 +21,8 @@ namespace lumora
         TransformProps transform{};
         InteractProps on{};
         Str                   className{};
+        /// Per-node CSS declarations (`padding: 4px; color: red`); reactive. Beat stylesheet rules except `!important`.
+        Str                   inlineCss{};
     };
 
     namespace detail

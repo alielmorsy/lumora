@@ -1,5 +1,6 @@
 #include <lumora/MountedApp.h>
 
+#include <lumora/Host/HostTree.h>
 #include <lumora/Input/Event.h>
 #include <lumora/Paint/ImageProvider.h>
 #include <lumora/Reactive/Context.h>
@@ -50,6 +51,8 @@ namespace lumora
         std::optional<Owner> owner;
         AppCtx ctx;
         NodeId root;
+        NodeId hostRoot; // the user root, else the content box
+        std::unique_ptr<HostTree> host;
         float appliedSurfaceW = 0.f;
         float appliedSurfaceH = 0.f;
         Elem blueprint;
@@ -214,10 +217,12 @@ namespace lumora
                 }
 
                 // Mount the user root into the content box.
+                hostRoot = contentBox;
                 if (contentBox.Valid() && elem.RawNode())
                 {
                     const NodeId userRoot = Instantiate(ctx, *elem.RawNode(), contentBox, *owner);
                     AppendChild(arena, contentBox, userRoot);
+                    hostRoot = userRoot;
                 }
             }
         }
@@ -225,6 +230,7 @@ namespace lumora
         ~Impl()
         {
             GraphScope ambient(*graph);
+            host.reset(); // its scopes free live nodes, so before the root owner and the arena
             owner.reset();
         }
     };
@@ -253,6 +259,15 @@ namespace lumora
     }
 
     MenuBarController& MountedApp::MenuBar() { return *m_impl->menuBar; }
+
+    HostTree& MountedApp::Host()
+    {
+        if (!m_impl->host)
+        {
+            m_impl->host.reset(new HostTree(m_impl->ctx, m_impl->hostRoot));
+        }
+        return *m_impl->host;
+    }
 
     void MountedApp::SetDragPreview(std::function<Elem(const DragPayload&)> builder)
     {

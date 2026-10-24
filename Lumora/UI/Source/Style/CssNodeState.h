@@ -6,10 +6,12 @@
 
 #include <lumora/StringId.h>
 #include <lumora/Reactive/Signal.h>
+#include <lumora/Style/Stylesheet.h>
 
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace lumora::style
@@ -54,6 +56,9 @@ namespace lumora::style
         LazySignal<uint32_t> classEpoch{0u};
         LazySignal<uint32_t> inheritEpoch{0u}; ///< bumped when inheritedOut changes; descendants subscribe
         std::vector<StringId> classes;
+        /// The inline `style` string last seen and its parse, so an unrelated re-resolve does not re-parse it.
+        std::string inlineSource;
+        std::vector<Declaration> inlineDecls;
         /// Pseudo-class states as one bit per Pseudo; the matcher reads it (tracked) so a state change re-resolves only nodes
         /// whose selectors test pseudo-state. One signal, as the matcher always reads every state at once.
         LazySignal<std::uint8_t> pseudo{std::uint8_t{0}};

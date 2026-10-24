@@ -16,6 +16,7 @@ add_library(lumora STATIC
     Source/Runtime/Instantiate.cpp
     Source/Runtime/ControlRuntime.cpp
     Source/Runtime/MountedApp.cpp
+    Source/Host/HostTree.cpp
     Source/Runtime/ContextMenuHost.cpp
     Source/Runtime/ContextMenuOverlay.cpp
     Source/Runtime/DragHost.cpp
