@@ -34,7 +34,8 @@
       },
       "cacheVariables": {
         "LUMORA_BUILD_GPU": "OFF",
-        "LUMORA_BUILD_SAMPLES": "OFF"
+        "LUMORA_BUILD_SAMPLES": "OFF",
+        "LUMORA_BUILD_SCRIPT": "OFF"
       }
     },
     {
