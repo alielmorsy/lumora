@@ -1,0 +1,12 @@
+{
+  "name": "@lumora/runtime",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": { "types": "./index.d.ts", "default": "./src/index.js" },
+    "./jsx-runtime": { "types": "./jsx-runtime.d.ts", "default": "./src/jsx-runtime.js" }
+  },
+  "scripts": { "test": "node --test test/" },
+  "peerDependencies": { "solid-js": "^1.9.9" },
+  "devDependencies": { "lumora": "*" }
+}
