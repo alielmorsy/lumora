@@ -27,7 +27,7 @@ g.__lumoraTick = (t) => {
   const due = [...timers].filter(([, x]) => x.due <= t).sort((a, b) => a[1].due - b[1].due);
   for (const [id, x] of due) {
     if (timers.get(id) !== x) continue;
-    if (x.repeat) x.due += Math.ceil((t - x.due + 1) / x.ms) * x.ms;
+    if (x.repeat) x.due += (Math.floor((t - x.due) / x.ms) + 1) * x.ms;
     else timers.delete(id);
     x.fn(...x.args);
   }

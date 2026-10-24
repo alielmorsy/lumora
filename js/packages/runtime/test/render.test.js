@@ -177,3 +177,11 @@ test("a short interval fires once after a long gap", async () => {
   ctx.__lumoraTick(1e9 + 1);
   assert.equal(ctx.log.filter((s) => s === "f").length, 2);
 });
+
+test("an interval catching up with a fractional tick lands on the next boundary", async () => {
+  const { ctx } = await run("timers");
+  ctx.__lumoraTick(199.5);
+  assert.deepEqual([...ctx.log], ["t", "i"]);
+  ctx.__lumoraTick(200);
+  assert.deepEqual([...ctx.log], ["t", "i", "i"]);
+});

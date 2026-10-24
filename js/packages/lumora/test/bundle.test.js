@@ -87,3 +87,39 @@ test("watch rebuild keeps last good output on error", async () => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("watch reports real changes only", async () => {
+  const dir = pkgTmp();
+  fs.cpSync(fx, dir, { recursive: true });
+  let r;
+  try {
+    const seen = [];
+    const wait = async (cond) => {
+      for (let i = 0; i < 500 && !cond(); i++) await new Promise((res) => setTimeout(res, 20));
+      assert.ok(cond(), JSON.stringify(seen));
+    };
+    r = await bundle({
+      entry: path.join(dir, "main.tsx"),
+      outfile: path.join(dir, "out.js"),
+      watch: true,
+      external: ["@lumora/runtime"],
+      onRebuild: (x) => seen.push(x.ok),
+    });
+    // esbuild runs one rebuild right after watch() starts, which must not be reported
+    await new Promise((res) => setTimeout(res, 300));
+    assert.deepEqual(seen, []);
+    const util = path.join(dir, "util.ts");
+    const good = read(util);
+    fs.writeFileSync(util, good);
+    await new Promise((res) => setTimeout(res, 300));
+    assert.deepEqual(seen, []);
+    fs.writeFileSync(util, "export const = ;\n");
+    await wait(() => seen.length === 1);
+    fs.writeFileSync(util, good);
+    await wait(() => seen.length === 2);
+    assert.deepEqual(seen, [false, true]);
+  } finally {
+    await r?.stop();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

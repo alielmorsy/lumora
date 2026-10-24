@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "bin": { "lumora": "bin/lumora.js" },
-  "scripts": { "test": "node --test \"test/*.test.js\"" },
+  "scripts": { "test": "node --test test/" },
   "dependencies": {
     "@babel/core": "^7.28.4",
     "@babel/preset-typescript": "^7.27.1",
