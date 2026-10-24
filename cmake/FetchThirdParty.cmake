@@ -8,13 +8,13 @@ option(LUMORA_FETCH_SUBMODULES "Fetch submodules of fetched third-party librarie
 # Shallow-clones <REPO>@<TAG> into DEST (once; an existing DEST is never touched, a changed tag
 # re-fetches), then turns it into a target.
 #   lumora_fetch_thirdparty(<name> REPO <owner/repo|url> TAG <tag> [DEST <dir>] [SUBMODULES]
-#                           [CMAKE [OPTIONS "VAR=VALUE"...]] [MANUAL] [SUBDIR <dir>] [ALIAS <ns::name>]
+#                           [CMAKE [OPTIONS "VAR=VALUE"...]] [MANUAL] [FETCH_ONLY] [SUBDIR <dir>] [ALIAS <ns::name>]
 #                           [INCLUDE ...] [SOURCES ...] [GLOB ...] [DEFINES ...] [LINK ...])
 # MANUAL (or any of INCLUDE/SOURCES/GLOB/DEFINES) builds it with lumora_add_thirdparty; otherwise the
-# library's own CMakeLists.txt is added with add_subdirectory.
+# library's own CMakeLists.txt is added with add_subdirectory. FETCH_ONLY stops after the clone.
 function(lumora_fetch_thirdparty NAME)
     cmake_parse_arguments(FT
-            "SUBMODULES;CMAKE;MANUAL"
+            "SUBMODULES;CMAKE;MANUAL;FETCH_ONLY"
             "REPO;TAG;DEST;ALIAS;SUBDIR"
             "OPTIONS;INCLUDE;SOURCES;GLOB;DEFINES;LINK"
             ${ARGN})
@@ -66,6 +66,9 @@ function(lumora_fetch_thirdparty NAME)
             message(FATAL_ERROR "lumora_fetch_thirdparty(${NAME}): clone failed:\n${_err}")
         endif ()
         file(WRITE "${FT_DEST}/.fetch_tag" "${FT_TAG}\n")
+    endif ()
+    if (FT_FETCH_ONLY)
+        return()
     endif ()
 
     set(_cmake_src "${FT_DEST}")
