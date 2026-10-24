@@ -8,3 +8,4 @@ TEST(HermesSmoke, SupportsModernSyntax) {
 }
 TEST(HermesSmoke, ReportsSyntaxErrors) { EXPECT_TRUE(lumora::script::EvalToString("let =").starts_with("Error:")); }
 TEST(HermesSmoke, Utf8RoundTrip) { EXPECT_EQ(lumora::script::EvalToString("'héllo 世界 👋'"), "héllo 世界 👋"); }
+TEST(HermesSmoke, ReportsThrownErrorMessage) { EXPECT_EQ(lumora::script::EvalToString("throw new Error('boom')"), "Error: boom"); }

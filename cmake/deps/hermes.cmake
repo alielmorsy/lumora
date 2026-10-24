@@ -8,6 +8,9 @@
 # MSVC builds inject hermes-msvc.cmake into the Hermes project; no Hermes source is patched.
 # ponytail: single-config generators only (CMAKE_BUILD_TYPE), pass the config through for VS/Xcode.
 include_guard(GLOBAL)
+if (NOT WIN32 AND NOT ANDROID)
+    message(FATAL_ERROR "LUMORA_BUILD_SCRIPT: Hermes is wired for Windows only so far (Android in Phase 2); configure with -DLUMORA_BUILD_SCRIPT=OFF")
+endif ()
 include(${LUMORA_ROOT_DIR}/cmake/FetchThirdParty.cmake)
 include(ExternalProject)
 
@@ -24,6 +27,8 @@ if (MSVC)
     set(_hermes_extra "-DCMAKE_PROJECT_Hermes_INCLUDE=${CMAKE_CURRENT_LIST_DIR}/hermes-msvc.cmake")
 endif ()
 
+# ponytail: CMAKE_TOOLCHAIN_FILE, ANDROID_* and a host hermesc (IMPORT_HOST_COMPILERS) are not forwarded
+# yet, so this only builds for the host. Phase 2 must add them for Android.
 ExternalProject_Add(hermes_build
         SOURCE_DIR "${_hermes_src}"
         BINARY_DIR "${_hermes_bin}"
