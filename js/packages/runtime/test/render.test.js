@@ -117,3 +117,63 @@ test("render applies collected css first", async () => {
   assert.deepEqual(calls[0], ["setStylesheet", ".a { color: red; }\n\n.b { color: blue; }\n"]);
   assert.equal(calls[1][0], "createNode");
 });
+
+test("creation-only props are set before the first native insert", async () => {
+  const { calls, root } = await run("creation");
+  const scroll = root.children[0].children[0];
+  const input = scroll.children[0];
+  const at = (n, name) => calls.findIndex((c) => c[0] === "setProp" && c[1] === n && c[2] === name);
+  assert.ok(at(scroll, "axis") >= 0 && at(scroll, "axis") < scroll.firstInsert);
+  assert.ok(at(input, "multiline") >= 0 && at(input, "multiline") < input.firstInsert);
+});
+
+test("Show toggle re-attaches the same native nodes", async () => {
+  const { ctx, calls, root, tree } = await run("reattach");
+  const outer = root.children[0];
+  const box = outer.children[1];
+  const before = tree();
+  const n = calls.length;
+  ctx.setOn(false);
+  assert.equal(outer.children.length, 1);
+  ctx.setOn(true);
+  const after = calls.slice(n);
+  assert.ok(!after.some((c) => c[0] === "createNode"), JSON.stringify(after.map((c) => c[0])));
+  assert.ok(after.some((c) => c[0] === "insert" && c[1] === outer && c[2] === box));
+  assert.equal(outer.children[1], box);
+  assert.deepEqual(tree(), before);
+});
+
+test("empty text stays JS-only until it has text", async () => {
+  const { ctx, calls, root } = await run("placeholder");
+  const [shows, bare] = root.children[0].children;
+  assert.deepEqual(shows.children.map((c) => c.tag), ["text"]);
+  assert.deepEqual(bare.children.map((c) => c.tag), ["text", "view"]);
+  assert.equal(calls.filter((c) => c[0] === "createNode" && c[1] === "text").length, 2);
+  ctx.setS("hi");
+  assert.deepEqual(
+    bare.children.map((c) => [c.tag, c.props.text]),
+    [["text", "a"], ["text", "hi"], ["view", undefined]],
+  );
+  ctx.setS("");
+  assert.deepEqual(bare.children.map((c) => c.props.text), ["a", "", undefined]);
+});
+
+test("removing a node that already moved elsewhere is a no-op", async () => {
+  const { ctx, root } = await run("moved");
+  const [v1, v2] = root.children[0].children;
+  ctx.api.setB([ctx.api.t]);
+  ctx.api.setA([ctx.api.x]);
+  assert.deepEqual(v1.children.map((c) => c.props.text), ["X"]);
+  assert.deepEqual(v2.children.map((c) => c.props.text), ["T"]);
+});
+
+test("a short interval fires once after a long gap", async () => {
+  const { ctx } = await run("timers");
+  ctx.fast();
+  const start = Date.now();
+  ctx.__lumoraTick(1e9);
+  assert.ok(Date.now() - start < 100);
+  assert.equal(ctx.log.filter((s) => s === "f").length, 1);
+  ctx.__lumoraTick(1e9 + 1);
+  assert.equal(ctx.log.filter((s) => s === "f").length, 2);
+});

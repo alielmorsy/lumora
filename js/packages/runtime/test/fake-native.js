@@ -16,9 +16,15 @@ export function createFakeNative() {
       if (!TAGS.has(tag)) throw new TypeError(`unknown tag "${tag}"`);
       return node(tag);
     },
+    // Like the host, a node goes live at its first insert, so the parent must already be reachable from the root.
+    // `firstInsert` is the index in `calls` of that first insert.
     insert(parent, child, before) {
       calls.push(["insert", parent, child, before]);
       if (before && before.parent !== parent) throw new Error("insert: before is not a child of parent");
+      let p = parent;
+      while (p && p !== root) p = p.parent;
+      if (!p) throw new Error("insert: parent is not attached to the root");
+      child.firstInsert ??= calls.length - 1;
       unlink(child);
       const i = before ? parent.children.indexOf(before) : parent.children.length;
       parent.children.splice(i, 0, child);

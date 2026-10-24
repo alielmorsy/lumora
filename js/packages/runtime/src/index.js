@@ -25,11 +25,23 @@ export {
   Suspense,
 } from "solid-js";
 
-// JS mirror of the native tree, only for Solid's parent/sibling walks. Elements are { tag, native, parent, children }.
-// Text nodes are { text, parent, native? }. Inside a `text` element they stay JS-only and the element's `text` prop is
-// their concatenation. Anywhere else they get a native `text` node.
+// JS mirror of the native tree, only for Solid's parent/sibling walks. Elements are { tag, native, parent, children },
+// text nodes are { text, parent, native? }. `linked` means the native node is inserted in the parent's native node.
+// A node is only linked once its parent is attached to the root, so a template's static props (some of them
+// creation-only in the host) are all set before its first native insert. Detaching keeps descendants linked under
+// the detached node, so re-attaching inserts the same native nodes again.
+// Inside a `text` element, text nodes stay JS-only and the element's `text` prop is their concatenation. Elsewhere a
+// text node gets a native `text` node once it has text, and keeps it after that.
 const isText = (n) => n.tag === undefined;
 const placed = (parent, n) => !isText(n) || parent.tag !== "text";
+
+function attached(n) {
+  for (; n; n = n.parent) {
+    if (n.root) return true;
+    if (!n.linked) return false;
+  }
+  return false;
+}
 
 function syncText(el) {
   const text = el.children.filter(isText).map((c) => c.text).join("");
@@ -44,10 +56,36 @@ function nextSibling(n) {
   return s ? s[s.indexOf(n) + 1] : undefined;
 }
 
+function nativeBefore(parent, n) {
+  const kids = parent.children;
+  for (let j = kids.indexOf(n) + 1; j < kids.length; j++) if (kids[j].linked) return kids[j].native;
+  return null;
+}
+
+// parent is attached. Links n (if not already) and then its unlinked descendants in child order.
+function link(parent, n) {
+  if (!placed(parent, n)) return;
+  if (!n.linked) {
+    if (!n.native) {
+      if (!n.text) return;
+      n.native = native.createNode("text");
+      native.setProp(n.native, "text", n.text);
+    }
+    native.insert(parent.native, n.native, nativeBefore(parent, n));
+    n.linked = true;
+  }
+  if (!isText(n)) for (const c of n.children) link(n, c);
+}
+
 function removeNode(parent, n) {
-  parent.children.splice(parent.children.indexOf(n), 1);
+  const i = parent.children.indexOf(n);
+  if (i < 0) return;
+  parent.children.splice(i, 1);
   n.parent = null;
-  if (placed(parent, n)) native.remove(parent.native, n.native);
+  if (n.linked) {
+    native.remove(parent.native, n.native);
+    n.linked = false;
+  }
   if (parent.tag === "text") syncText(parent);
 }
 
@@ -57,7 +95,6 @@ export function insertNode(parent, n, anchor) {
   const old = n.parent;
   if (old) {
     old.children.splice(old.children.indexOf(n), 1);
-    if (placed(old, n) && !placed(parent, n)) native.remove(old.native, n.native);
     if (old !== parent && old.tag === "text") syncText(old);
   }
   n.parent = parent;
@@ -65,16 +102,15 @@ export function insertNode(parent, n, anchor) {
   const i = anchor ? kids.indexOf(anchor) : -1;
   if (i < 0) kids.push(n);
   else kids.splice(i, 0, n);
-  if (placed(parent, n)) {
-    if (!n.native) {
-      n.native = native.createNode("text");
-      native.setProp(n.native, "text", n.text);
+  const live = placed(parent, n) && attached(parent);
+  if (n.linked) {
+    if (live) native.insert(parent.native, n.native, nativeBefore(parent, n));
+    else {
+      native.remove(old.native, n.native);
+      n.linked = false;
     }
-    let before = null;
-    for (let j = i < 0 ? kids.length : i + 1; j < kids.length && !before; j++)
-      if (placed(parent, kids[j])) before = kids[j].native;
-    native.insert(parent.native, n.native, before);
   }
+  if (live) link(parent, n);
   if (parent.tag === "text") syncText(parent);
 }
 
@@ -85,6 +121,7 @@ const renderer = createRenderer({
   replaceText(n, text) {
     n.text = text;
     if (n.native) native.setProp(n.native, "text", text);
+    else if (n.parent && attached(n.parent)) link(n.parent, n);
     if (n.parent?.tag === "text") syncText(n.parent);
   },
   setProperty,
@@ -101,7 +138,7 @@ export const { effect, memo, createComponent, createElement, createTextNode, ins
 export function render(code) {
   const css = globalThis.__lumoraCss ?? [];
   if (css.length) native.setStylesheet(css.join("\n"));
-  const root = { tag: "root", native: native.root(), parent: null, children: [] };
+  const root = { tag: "root", root: true, native: native.root(), parent: null, children: [] };
   const dispose = renderer.render(code, root);
   return () => {
     dispose();
