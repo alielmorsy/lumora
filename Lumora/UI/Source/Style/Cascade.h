@@ -5,6 +5,8 @@
 
 #include <lumora/Style/Stylesheet.h>
 
+#include <span>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -26,4 +28,11 @@ namespace lumora::style
     /// Winner per property is by (!important, specificity, source order); `extra` adds rules of passing `@media` groups.
     [[nodiscard]] ComputedStyle Cascade(NodeHandle node, const MatchOps& ops, const StyleIndex& index,
                                         const std::vector<const Rule*>& extra = {});
+
+    /// Declarations of an inline `style` string (`a: b; c: d`); malformed ones are skipped, never throws.
+    [[nodiscard]] std::vector<Declaration> ParseInlineDeclarations(std::string_view css);
+
+    /// Write inline declarations over a cascaded style: they beat every rule value except an `!important` one. A shorthand
+    /// replaces the rule's longhands of its family, and an `!important` shorthand shields its longhands.
+    void ApplyDeclarations(ComputedStyle& cs, std::span<const Declaration> decls);
 } // namespace lumora::style

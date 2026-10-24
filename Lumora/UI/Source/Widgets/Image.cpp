@@ -12,6 +12,7 @@
 #include "Runtime/AppCtx.h"
 #include "Runtime/Instantiate.h"
 #include "Runtime/Paint.h"
+#include "Style/StyleResolver.h"
 #include "Widgets/ImageFit.h"
 #include "Widgets/Widget.h"
 
@@ -39,6 +40,18 @@ void ResolveImage(ImageProvider* provider, NodeArena& arena, NodeId id) {
     p.resolved = p.handle.Valid() ? p.handle : p.acquired;
 }
 
+/// The slice of ImageCfg the style resolver re-applies; its effect holds this for the node's lifetime.
+struct ImageStyleCfg {
+    LayoutProps           layout;
+    Reactive<float>       opacity;
+    Reactive<float>       radius;
+    Reactive<std::string> className;
+    Reactive<std::string> inlineCss;
+    struct {
+        Reactive<bool> disabled;
+    } on;
+};
+
 class ImageWidget final : public TypedWidget<ImageCfg> {
     [[nodiscard]] const char* Name() const noexcept override { return "Image"; }
     [[nodiscard]] bool        ContentSized() const noexcept override { return true; }
@@ -54,13 +67,30 @@ class ImageWidget final : public TypedWidget<ImageCfg> {
         BindProp(ctx.arena, id, cfg.handle,
                  [](NodeArena& a, NodeId n, const ImageHandle& v) { a.PayloadOf<ImagePayload>(n).handle = v; },
                  Dirty::Layout);
-        BindProp(ctx.arena, id, cfg.opacity,
-                 [](NodeArena& a, NodeId n, const float& v) { a.PayloadOf<ImagePayload>(n).opacity = v; },
-                 Dirty::Style);
-        BindProp(ctx.arena, id, cfg.radius,
-                 [](NodeArena& a, NodeId n, const float& v) { a.PayloadOf<ImagePayload>(n).radius = v; },
-                 Dirty::Style);
-        BindLayoutProps(ctx.arena, id, cfg.layout);
+        if (ctx.style) {
+            // Sole writer of size, spacing, opacity and radius: CSS wins, the inline cfg is origin-0. BindLayoutProps still
+            // seeds the structural fields once; width/height are left to the resolver so two writers never race.
+            LayoutProps seed = cfg.layout;
+            seed.width       = Wrap;
+            seed.height      = Wrap;
+            BindLayoutProps(ctx.arena, id, seed);
+            style::BindClass(ctx, id, ImageStyleCfg{cfg.layout, cfg.opacity, cfg.radius, cfg.className, cfg.inlineCss, {cfg.on.disabled}},
+                             [](NodeArena& a, NodeId n, const style::ComputedStyle& cs, const ImageStyleCfg& c) {
+                                 style::ApplyLayout(a, n, cs, c.layout);
+                                 ImagePayload& p = a.PayloadOf<ImagePayload>(n);
+                                 p.opacity = cs.Get("opacity"_sid) ? style::ToNumber(*cs.Get("opacity"_sid), c.opacity.Get()) : c.opacity.Get();
+                                 p.radius  = cs.Get("border-radius"_sid) ? style::ToPx(*cs.Get("border-radius"_sid), c.radius.Get()) : c.radius.Get();
+                                 a.Resolve(n).MarkDirty(Dirty::All);
+                             });
+        } else {
+            BindProp(ctx.arena, id, cfg.opacity,
+                     [](NodeArena& a, NodeId n, const float& v) { a.PayloadOf<ImagePayload>(n).opacity = v; },
+                     Dirty::Style);
+            BindProp(ctx.arena, id, cfg.radius,
+                     [](NodeArena& a, NodeId n, const float& v) { a.PayloadOf<ImagePayload>(n).radius = v; },
+                     Dirty::Style);
+            BindLayoutProps(ctx.arena, id, cfg.layout);
+        }
         BindViewProps<ImagePayload>(ctx.arena, id, cfg.view, &ImagePayload::view);
         BindInteractProps<ImagePayload>(ctx, id, cfg.on, &ImagePayload::on);
 

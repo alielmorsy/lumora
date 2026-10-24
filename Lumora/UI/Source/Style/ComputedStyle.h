@@ -82,6 +82,8 @@ namespace lumora::style
     {
         PropMap props;
         PropMap customProps;
+        /// Properties (custom ones included) whose winning value came from an `!important` rule; inline CSS may not override them.
+        std::vector<StringId> important;
 
         [[nodiscard]] const CssValue* Get(StringId prop) const
         {

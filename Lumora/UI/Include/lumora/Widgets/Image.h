@@ -18,6 +18,10 @@ struct ImageCfg {
     LayoutProps           layout{};
     ViewProps             view{};
     InteractProps         on{};
+    /// Space-separated CSS class list (reactive); layout size, opacity and border-radius come from CSS when a StyleEngine is wired.
+    Str                   className{};
+    /// Per-node CSS declarations (`padding: 4px; color: red`); reactive. Beat stylesheet rules except `!important`.
+    Str                   inlineCss{};
 };
 
 /// Image leaf. Draws `handle` if set, else decodes `src` through the app's ImageProvider. A headless

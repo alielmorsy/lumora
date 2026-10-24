@@ -24,6 +24,8 @@ namespace lumora
         InteractProps on{};
         /// Space-separated CSS class list; reactive, so toggling re-resolves style. Ignored when no StyleEngine is wired.
         Str                   className{};
+        /// Per-node CSS declarations (`padding: 4px; color: red`); reactive. Beat stylesheet rules except `!important`.
+        Str                   inlineCss{};
         /// Pure-visual translation at PAINT and HIT-TEST time without dirtying layout.
         /// Changing it marks repaint only, preserving retained subtree replay.
         Reactive<Vec2> paintOffset{};

@@ -25,7 +25,8 @@
 namespace lumora::style
 {
     /// Per-node style-resolution effect; sole writer of the node's styleable fields. Re-runs on sheet generation, className,
-    /// ancestor class epochs and pseudo-state; `apply` writes the CSS value or the inline cfg (origin-0). `Cfg` needs reactive `.className`.
+    /// ancestor class epochs and pseudo-state; `apply` writes the CSS value or the inline cfg (origin-0). `Cfg` needs reactive `.className`;
+    /// an optional reactive `.inlineCss` declaration string beats the rules (except `!important`).
     template <typename Cfg, typename Apply>
     void BindClass(AppCtx& ctx, NodeId id, const Cfg& cfg, Apply apply)
     {
@@ -57,6 +58,17 @@ namespace lumora::style
             }
             const std::vector<const Rule*> mediaRules = eng->PassingMediaRules();
             ComputedStyle cs = Cascade(id.value, eng->MakeOps(*arena), eng->Index(), mediaRules);
+
+            if constexpr (requires { cfg.inlineCss.Get(); })
+            {
+                const std::string& inl = cfg.inlineCss.Get(); // dep: inlineCss (if reactive)
+                if (inl != st.inlineSource)
+                {
+                    st.inlineSource = inl;
+                    st.inlineDecls = inl.empty() ? std::vector<Declaration>{} : ParseInlineDeclarations(inl);
+                }
+                ApplyDeclarations(cs, st.inlineDecls);
+            }
 
             // Pipeline: vars -> font-size/units -> inheritance, all before apply.
             const InheritedStyle* parentInh = eng->ParentInherited(*arena, id); // subscribes to parent inheritEpoch
@@ -413,6 +425,7 @@ namespace lumora::style
         TextFlowProps flow;
         LayoutProps layout;
         Reactive<std::string> className;
+        Reactive<std::string> inlineCss;
         struct
         {
             Reactive<bool> disabled;
