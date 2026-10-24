@@ -12,7 +12,7 @@ namespace lumora {
 struct ImageCfg {
     Str                   src{};
     Reactive<ImageHandle> handle{};   ///< a GPU-registered image (RegisterExternalImage); wins over src when Valid()
-    ImageFit              fit     = ImageFit::Contain;
+    Reactive<ImageFit>    fit     = ImageFit::Contain;
     Reactive<float>       opacity = 1.f;
     Reactive<float>       radius  = 0.f;
     LayoutProps           layout{};

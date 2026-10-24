@@ -59,7 +59,9 @@ class ImageWidget final : public TypedWidget<ImageCfg> {
     void Build(AppCtx& ctx, ImageCfg& cfg, NodeId id, Owner& owner) override {
         const std::uint32_t slot = ctx.arena.Pool<ImagePayload>(LiveKind::Image).Alloc();
         ctx.arena.Resolve(id).payload = PayloadRef{LiveKind::Image, slot};
-        ctx.arena.PayloadOf<ImagePayload>(id).fit = cfg.fit;
+        BindProp(ctx.arena, id, cfg.fit,
+                 [](NodeArena& a, NodeId n, const ImageFit& v) { a.PayloadOf<ImagePayload>(n).fit = v; },
+                 Dirty::Repaint);
 
         BindProp(ctx.arena, id, cfg.src,
                  [](NodeArena& a, NodeId n, const std::string& v) { a.PayloadOf<ImagePayload>(n).src = v; },

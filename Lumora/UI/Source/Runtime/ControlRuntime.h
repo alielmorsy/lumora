@@ -28,10 +28,15 @@ struct MountedBody {
     NodeId                 root;
 };
 
-/// Builds `builder` under a child scope of `host`'s owner and instantiates the result. Does NOT link the root into `host`: the caller splices it.
-[[nodiscard]] MountedBody MountBody(AppCtx& ctx, NodeId host, const std::function<Elem()>& builder);
+/// Builds `builder` under a child scope of `host`'s owner (or of `scopeParent` when given) and instantiates the result. Does NOT link the
+/// root into `host`: the caller splices it.
+[[nodiscard]] MountedBody MountBody(AppCtx& ctx, NodeId host, const std::function<Elem()>& builder,
+                                    Owner* scopeParent = nullptr);
 
 void UnlinkChild(NodeArena& arena, NodeId parentId, NodeId childId);
+
+/// Links an unlinked `child` into `parent` right before `before` in O(1); an invalid `before` appends.
+void InsertChildBefore(NodeArena& arena, NodeId parent, NodeId child, NodeId before);
 
 /// Rewrites the parent's child list to exactly `order`; surviving rows keep their solver nodes (a keyed reorder is a move).
 void SetChildOrder(NodeArena& arena, NodeId parentId, std::span<const NodeId> order);

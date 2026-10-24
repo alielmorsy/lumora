@@ -1,5 +1,6 @@
 #pragma once
 
+#include <lumora/Api.h>
 #include <lumora/Foundation/Vec2.h>
 
 #include <algorithm>
@@ -94,6 +95,9 @@ namespace lumora
     {
         return detail::InRange(key, Key::LeftShift, Key::RightSuper);
     }
+
+    /// The DOM `KeyboardEvent.key` spelling of an unshifted key ("Enter", "ArrowLeft", "a", "1"); "Unidentified" for Unknown.
+    [[nodiscard]] LUMORA_API std::string_view KeyName(Key key) noexcept;
 
     enum class KeyMods : std::uint8_t
     {
