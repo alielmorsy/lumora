@@ -310,7 +310,7 @@ void CommandBuffer::CopyBufferToImage(BufferHandle src, TextureHandle dst, Image
 // Upgrade: wgpuCommandEncoderCopyTextureToBuffer with 256-byte aligned bytesPerRow and MapAsync readback.
 void CommandBuffer::CopyImageToBuffer(TextureHandle, ImageLayout, BufferHandle, std::span<const BufferImageCopy>)
 {
-    LOG_ERROR("CopyImageToBuffer is not supported on WebGPU");
+    LOG_ONCE("CopyImageToBuffer is not supported on WebGPU");
 }
 
 // Labels only go on the command encoder outside passes, so groups never straddle a pass boundary.
