@@ -164,6 +164,9 @@ void* RHIResources::GetMappedPointer(BufferHandle buffer) const
     return b && !b->shadow.empty() ? b->shadow.data() : nullptr;
 }
 
+// GpuToCpu readback is not supported on WebGPU yet (see CommandBuffer::CopyImageToBuffer).
+void RHIResources::InvalidateMapped(BufferHandle, uint64_t, uint64_t) {}
+
 void RHIResources::FlushMapped(BufferHandle buffer, uint64_t offset, uint64_t size)
 {
     if (!_n)

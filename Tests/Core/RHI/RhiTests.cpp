@@ -365,6 +365,7 @@ TEST_F(RhiTest, CopyImageToBufferReadsBackClear)
         cmd.CopyImageToBuffer(tex, ImageLayout::TransferSrc, buf, std::span(&region, 1));
     });
     rhi.WaitIdle();
+    rhi.Resources().InvalidateMapped(buf, 0, 64);
 
     const auto* px = static_cast<const uint8_t*>(rhi.Resources().GetMappedPointer(buf));
     ASSERT_NE(px, nullptr);

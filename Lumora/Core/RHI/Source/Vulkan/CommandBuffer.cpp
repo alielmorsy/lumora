@@ -597,6 +597,16 @@ void CommandBuffer::CopyImageToBuffer(TextureHandle src, ImageLayout srcLayout, 
     vkCmdCopyImageToBuffer(static_cast<VkCommandBuffer>(_cmd), t->image, detail::ToVk(srcLayout), b->buffer,
                            static_cast<uint32_t>(vkRegions.size()), vkRegions.data());
 
+    // Make the copy visible to host reads after the fence wait (pair with RHIResources::InvalidateMapped).
+    VkBufferMemoryBarrier mb{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
+    mb.srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT;
+    mb.dstAccessMask       = VK_ACCESS_HOST_READ_BIT;
+    mb.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    mb.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    mb.buffer              = b->buffer;
+    mb.size                = VK_WHOLE_SIZE;
+    vkCmdPipelineBarrier(static_cast<VkCommandBuffer>(_cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0,
+                         0, nullptr, 1, &mb, 0, nullptr);
 }
 
 void CommandBuffer::BeginDebugLabel(std::string_view name, Color color)

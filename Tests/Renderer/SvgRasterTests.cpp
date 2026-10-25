@@ -60,6 +60,7 @@ namespace
             ctx.cmd->CopyImageToBuffer(tex, rhi::ImageLayout::TransferSrc, buf, std::span(&region, 1));
             device.EndFrame(ctx);
             device.WaitIdle();
+            device.Resources().InvalidateMapped(buf, 0, std::uint64_t{kW} * kH * 4);
 
             const auto* px = static_cast<const std::uint8_t*>(device.Resources().GetMappedPointer(buf));
             out.assign(px, px + std::size_t{kW} * kH * 4);
