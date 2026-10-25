@@ -1,6 +1,7 @@
 #pragma once
 
 #include <lumora/Host/HostTree.h>
+#include <lumora/script/NativeModule.h>
 
 #include <jsi/jsi.h>
 
@@ -9,6 +10,8 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -41,6 +44,10 @@ namespace lumora::script
         std::size_t                           pruneAt = 64;
         std::atomic<bool>                     tearingDown{false};
 
+        const ModuleRegistry*                         modules = nullptr;
+        Invoker                                       invoker;
+        std::unordered_map<std::string, jsi::Object> moduleExports; ///< installed modules of this runtime
+
         std::mutex              releasedMutex; ///< node ref finalizers may run on a GC thread
         std::vector<HostHandle> released;
 
@@ -48,7 +55,7 @@ namespace lumora::script
         void DrainReleased();
         /// Releases every handle JS still owns, then clears the root.
         void ReleaseAll();
-        /// Empties every JsHandler; call before destroying the runtime.
+        /// Empties every JsHandler and the module cache; call before destroying the runtime.
         void DropHandlers();
     };
 

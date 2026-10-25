@@ -12,12 +12,15 @@ class MountedApp;
 
 namespace lumora::script
 {
+    class ModuleRegistry;
+
     /// One JS app on Hermes, driving `app.Host()` through the global `__lumora`. Destroy it before the MountedApp.
     /// A JS error (load, tick, handler or microtask) shows a red overlay and stops the app until the next Load.
     class LUMORA_API JsApp
     {
     public:
-        explicit JsApp(MountedApp& app);
+        /// `modules` backs `__lumora.requireModule` and must outlive the JsApp; null links none.
+        explicit JsApp(MountedApp& app, const ModuleRegistry* modules = nullptr);
         ~JsApp();
 
         JsApp(const JsApp&)            = delete;
@@ -25,7 +28,8 @@ namespace lumora::script
 
         /// Unloads, then evaluates `source` in a fresh runtime with `__lumora` installed; false on error.
         bool Load(std::string_view source, std::string_view sourceUrl);
-        /// Calls the global `__lumoraTick(ms since the first Tick after Load)` if defined, then drains microtasks.
+        /// Runs the jobs native modules posted through their Invoker, then calls the global
+        /// `__lumoraTick(ms since the first Tick after Load)` if defined, then drains microtasks.
         void Tick(double nowMs);
         /// Destroys the runtime, then frees every node the script built.
         void Unload();

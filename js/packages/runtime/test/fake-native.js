@@ -1,7 +1,7 @@
 // In-memory stand-in for the host's globalThis.__lumora. Every call is recorded in `calls`.
 const TAGS = new Set(["view", "text", "button", "input", "image", "scroll"]);
 
-export function createFakeNative() {
+export function createFakeNative({ modules = {} } = {}) {
   const calls = [];
   const node = (tag) => ({ tag, props: {}, handlers: {}, children: [], parent: null });
   const root = node("root");
@@ -51,6 +51,7 @@ export function createFakeNative() {
     log(level, msg) {
       calls.push(["log", level, msg]);
     },
+    requireModule: (name) => modules[name],
   };
   const snap = (n) => ({ tag: n.tag, props: { ...n.props }, handlers: { ...n.handlers }, children: n.children.map(snap) });
   return { api, calls, tree: () => snap(root) };

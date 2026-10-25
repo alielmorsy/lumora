@@ -4,10 +4,13 @@ endif ()
 
 add_library(lumora_js_host STATIC JsHost.cpp)
 target_include_directories(lumora_js_host PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(lumora_js_host PUBLIC lumora_sample_host PRIVATE lumora::script)
+target_link_libraries(lumora_js_host PUBLIC lumora_sample_host lumora::script)
 lumora_defaults(lumora_js_host)
 
 lumora_add_sample(LumoraJsHost main.cpp)
+if (NOT LUMORA_JS_MODULES_CMAKE)
+    target_sources(LumoraJsHost PRIVATE NoModules.cpp)
+endif ()
 target_link_libraries(LumoraJsHost PRIVATE lumora_js_host)
 
 if (LUMORA_BUILD_TESTS AND NOT ANDROID AND NOT EMSCRIPTEN)

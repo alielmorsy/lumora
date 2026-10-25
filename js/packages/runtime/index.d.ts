@@ -25,3 +25,6 @@ export {
 
 /** Applies the imported CSS, mounts `code()` into the host root and returns a function that unmounts it. */
 export function render(code: () => JSX.Element): () => void;
+
+/** Returns the exports of the native module `name`; throws when no linked package provides it. */
+export function requireNativeModule<T = any>(name: string): T;

@@ -129,6 +129,7 @@ namespace lumora::script
             if (const std::shared_ptr<JsHandler> h = w.lock()) h->fn.reset();
         }
         handlers.clear();
+        moduleExports.clear();
     }
 
     void InstallBridge(jsi::Runtime& rt, const std::shared_ptr<BridgeState>& state)
@@ -223,6 +224,21 @@ namespace lumora::script
             default: LOG_INFO("{}", text); break;
             }
             return jsi::Value::undefined();
+        });
+
+        // Installs on first use and returns the same exports object after that; undefined when not linked.
+        def("requireModule", 1, [s](jsi::Runtime& r, const jsi::Value&, const jsi::Value* args, std::size_t n) -> jsi::Value
+        {
+            const std::string name = Str(r, Arg(args, n, 0), "requireModule: name");
+            if (const auto it = s->moduleExports.find(name); it != s->moduleExports.end()) return jsi::Value(r, it->second);
+            const InstallFn install = s->modules ? s->modules->Find(name) : nullptr;
+            if (!install) return jsi::Value::undefined();
+            jsi::Object exports(r);
+            ModuleContext ctx{r, exports, s->invoker};
+            install(ctx);
+            jsi::Value result(r, exports);
+            s->moduleExports.emplace(name, std::move(exports));
+            return result;
         });
 
         rt.global().setProperty(rt, "__lumora", std::move(lumora));

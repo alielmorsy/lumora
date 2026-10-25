@@ -145,3 +145,10 @@ export function render(code) {
     while (root.children.length) removeNode(root, root.children[0]);
   };
 }
+
+/** Returns the exports of the native module `name` linked into the host. */
+export function requireNativeModule(name) {
+  const m = native.requireModule?.(name);
+  if (m !== undefined) return m;
+  throw new Error(`Native module "${name}" is not linked into this host. Install the package that provides it and restart the dev command.`);
+}

@@ -7,6 +7,7 @@
 #include <lumora/Widgets/Box.h>
 #include <lumora/Widgets/Text.h>
 #include <lumora/script/JsApp.h>
+#include <lumora/script/NativeModule.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -34,6 +35,7 @@ struct HostState {
     double nowMs  = 0.0;
     double nextPollMs = 0.0;
     std::optional<fs::file_time_type> stamp;
+    script::ModuleRegistry modules;
     std::unique_ptr<script::JsApp> js;
 
     void ReportError() const { std::fprintf(stderr, "%s\n", js->LastError().c_str()); }
@@ -61,7 +63,7 @@ struct HostState {
         ++frame;
         if (!bundle.empty()) {
             if (!js)
-                js = std::make_unique<script::JsApp>(app);
+                js = std::make_unique<script::JsApp>(app, &modules);
             if (nowMs >= nextPollMs) {
                 nextPollMs = nowMs + kPollMs;
                 Poll();
@@ -90,6 +92,7 @@ struct HostState {
 int RunJsHost(int argc, char** argv)
 {
     auto state = std::make_shared<HostState>();
+    script::RegisterLinkedModules(state->modules);
     std::string title = "Lumora";
     int headlessFrames = -1;
     int exitAfter      = -1;
