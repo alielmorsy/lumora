@@ -29,6 +29,7 @@ Try it: build `LumoraJsHost` (`scripts\build.cmd --target LumoraJsHost`), set `L
 |---|---|---|---|
 | 1 | C++ module API (`LUMORA_NATIVE_MODULE`, `ModuleRegistry`, invoker, `requireNativeModule`) | 9474867 | lumora_script_tests 22/22, runtime 16/16 |
 | 2 | Module discovery + desktop link files (`link.js`) | 804d66b | lumora 28/28 |
+| 3 | Custom desktop host build: `buildHost`, vswhere/vcvars `msvcEnv`, async `resolveHost` (`--host`, then `LUMORA_HOST`, then `LUMORA_SOURCE` build), `LUMORA_JS_MODULES_CMAKE`, examples `echo-module` + `native-app` | see git log | lumora 49/49 (+3 e2e with real host: `echo: hi`, `later: hi`) |
 | 4 | `lumora create-module` template (C++ + Kotlin + TS) | 16d407d | lumora 34/34; templates not compiled yet |
 | 8 | `lumora android`: Gradle project generation, install/launch, adb push loop (JS side) | f36ce9e | lumora 42/42, fake runner only |
 
@@ -37,15 +38,8 @@ accepted on the implementers' own test evidence.
 
 ## Left
 
-### Unfinished: Phase 2 Task 3 (custom desktop host build)
-
-Stopped by the user mid-task, at the RED stage, so nothing was committed. Its uncommitted work is still in the
-`G:/works/Lumora-js-native` worktree:
-- Modified: `Samples/JsHost/CMakeLists.txt`, plus the `dev`, `e2e` and `link` tests.
-- New: `js/examples/echo-module/`, `js/examples/native-app/` and `test/build-host.test.js`.
-
-Still to build: `src/build-host.js`, `src/msvc.js` and the new `resolveHost` order. Until this lands, apps with C++
-modules can't run, because no generated `RegisterLinkedModules` is linked.
+Try native modules: `set LUMORA_SOURCE=<this checkout>` and run `npm run dev` in `js/examples/native-app`. The first
+run builds Lumora + Hermes into `.lumora/host/`; later runs are incremental.
 
 ### Dropped for now: Android
 
@@ -62,6 +56,7 @@ modules can't run, because no generated `RegisterLinkedModules` is linked.
 
 ### Needs a human
 
+- Native-app window check: `npm run dev` in `js/examples/native-app` with `LUMORA_SOURCE` set shows both lines, and editing `Echo.cpp` then restarting rebuilds incrementally.
 - Phase 1 window checks:
   - The counter renders and clicks.
   - Save reloads in under 2 s.

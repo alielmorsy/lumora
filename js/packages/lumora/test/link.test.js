@@ -102,3 +102,11 @@ test("no modules writes an empty target list", async () => {
   assert.match(cmake, /set\(LUMORA_JS_MODULE_TARGETS\s*\)/);
   assert.ok(!cmake.includes("add_subdirectory"));
 });
+
+test("finds modules hoisted to an ancestor node_modules (workspaces)", async () => {
+  const ws = await tmp();
+  await pkg(path.join(ws, "node_modules/h"), "h", cpp("Hoisted"));
+  const root = path.join(ws, "examples", "app");
+  await write(path.join(root, "package.json"), JSON.stringify({ name: "app" }));
+  assert.deepEqual((await discoverModules(root)).map((m) => m.name), ["Hoisted"]);
+});

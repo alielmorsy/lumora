@@ -8,7 +8,12 @@ target_link_libraries(lumora_js_host PUBLIC lumora_sample_host lumora::script)
 lumora_defaults(lumora_js_host)
 
 lumora_add_sample(LumoraJsHost main.cpp)
-if (NOT LUMORA_JS_MODULES_CMAKE)
+if (LUMORA_JS_MODULES_CMAKE)
+    # Written by `lumora dev`: adds the app's module subdirectories and sets the two variables below.
+    include(${LUMORA_JS_MODULES_CMAKE})
+    target_sources(LumoraJsHost PRIVATE ${LUMORA_JS_MODULES_SOURCE})
+    target_link_libraries(LumoraJsHost PRIVATE ${LUMORA_JS_MODULE_TARGETS})
+else ()
     target_sources(LumoraJsHost PRIVATE NoModules.cpp)
 endif ()
 target_link_libraries(LumoraJsHost PRIVATE lumora_js_host)

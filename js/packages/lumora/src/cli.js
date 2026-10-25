@@ -14,7 +14,8 @@ const HELP = `Usage:
   lumora dev [--host <exe>] [-- <host args>]
   lumora android [--device <serial>]
 
-The host is --host, then the LUMORA_HOST environment variable.
+The host is --host, then LUMORA_HOST, then a host built from LUMORA_SOURCE (a Lumora checkout) with the app's
+C++ native modules linked in.
 lumora android needs LUMORA_SOURCE (a Lumora checkout), ANDROID_HOME and JAVA_HOME.
 `;
 
@@ -55,7 +56,7 @@ export async function main(argv, cwd = process.cwd()) {
       return 0;
     }
     if (first === "dev") {
-      const host = resolveHost({ flag: values.host });
+      const host = await resolveHost({ flag: values.host, root: cwd });
       const ac = new AbortController();
       for (const s of ["SIGINT", "SIGTERM"]) process.on(s, () => ac.abort());
       return await dev({ root: cwd, host, hostArgs, signal: ac.signal });

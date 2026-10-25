@@ -6,12 +6,16 @@ const slash = (p) => p.replaceAll("\\", "/");
 const exists = (p) => fs.access(p).then(() => true, () => false);
 const ls = (dir) => fs.readdir(dir).catch(() => []);
 
+// The app plus every package in its node_modules and its ancestors' (npm workspaces hoist to the workspace root).
 async function packageDirs(root) {
-  const nm = path.join(root, "node_modules");
   const dirs = [root];
-  for (const e of await ls(nm)) {
-    if (e.startsWith("@")) for (const s of await ls(path.join(nm, e))) dirs.push(path.join(nm, e, s));
-    else if (!e.startsWith(".")) dirs.push(path.join(nm, e));
+  for (let dir = path.resolve(root); ; dir = path.dirname(dir)) {
+    const nm = path.join(dir, "node_modules");
+    for (const e of await ls(nm)) {
+      if (e.startsWith("@")) for (const s of await ls(path.join(nm, e))) dirs.push(path.join(nm, e, s));
+      else if (!e.startsWith(".")) dirs.push(path.join(nm, e));
+    }
+    if (path.dirname(dir) === dir) break;
   }
   return dirs;
 }

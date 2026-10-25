@@ -57,10 +57,11 @@ test("lumora and @lumora/runtime are released in lockstep", () => {
   assert.equal(json(here, "..", "package.json").version, json(here, "..", "..", "runtime", "package.json").version);
 });
 
-test("resolveHost order", () => {
-  assert.equal(resolveHost({ flag: "a.exe", env: { LUMORA_HOST: "b.exe" } }), "a.exe");
-  assert.equal(resolveHost({ env: { LUMORA_HOST: "b.exe" } }), "b.exe");
-  assert.throws(() => resolveHost({ env: {} }), /LumoraJsHost.*LUMORA_HOST/s);
+test("resolveHost order", async () => {
+  const root = tmp();
+  assert.equal(await resolveHost({ flag: "a.exe", env: { LUMORA_HOST: "b.exe" }, root }), "a.exe");
+  assert.equal(await resolveHost({ env: { LUMORA_HOST: "b.exe" }, root }), "b.exe");
+  await assert.rejects(resolveHost({ env: {}, root }), /LUMORA_HOST.*LUMORA_SOURCE/s);
 });
 
 test("cli: first positional that is not a command is the project name", () => {

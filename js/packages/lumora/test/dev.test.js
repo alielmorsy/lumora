@@ -143,7 +143,9 @@ test("dev reports a host that cannot be started", { timeout: 30000 }, () =>
 test("cli: dev without a host explains how to get one", () => {
   const env = { ...process.env };
   delete env.LUMORA_HOST;
+  delete env.LUMORA_SOURCE;
   const r = spawnSync(process.execPath, [path.join(here, "..", "bin", "lumora.js"), "dev"], { cwd: os.tmpdir(), env, encoding: "utf8" });
   assert.equal(r.status, 1);
   assert.match(r.stderr, /LUMORA_HOST/);
+  assert.match(r.stderr, /LUMORA_SOURCE/);
 });
