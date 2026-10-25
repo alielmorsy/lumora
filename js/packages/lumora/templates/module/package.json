@@ -1,0 +1,16 @@
+{
+  "name": "{{npmName}}",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": ["index.js", "index.d.ts", "native"],
+  "peerDependencies": {
+    "@lumora/runtime": "^{{runtimeVersion}}"
+  },
+  "lumora": {
+    "module": "{{Name}}",
+    "cpp": { "dir": "native/cpp", "target": "lumora_{{lower}}" },
+    "android": { "dir": "native/android", "class": "{{androidPackage}}.{{Name}}Module" }
+  }
+}

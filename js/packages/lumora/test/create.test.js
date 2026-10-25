@@ -32,6 +32,7 @@ test("create scaffolds a project", async () => {
   const version = json(here, "..", "..", "runtime", "package.json").version;
   assert.equal(pkg.name, "demo");
   assert.equal(pkg.scripts.dev, "lumora dev");
+  assert.equal(pkg.scripts.android, "lumora android");
   assert.equal(pkg.dependencies["@lumora/runtime"], `^${version}`);
   assert.equal(pkg.devDependencies.lumora, `^${version}`);
   for (const f of files(dir)) assert.ok(!fs.readFileSync(f, "utf8").includes("{{"), f);

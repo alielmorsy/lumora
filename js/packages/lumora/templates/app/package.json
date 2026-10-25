@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "lumora dev"
+    "dev": "lumora dev",
+    "android": "lumora android"
   },
   "dependencies": {
     "@lumora/runtime": "^{{runtimeVersion}}",
