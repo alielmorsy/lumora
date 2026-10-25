@@ -17,6 +17,7 @@ lumora_add_test(lumora_tests SOURCES
     CountersTests.cpp
     DockDetachTests.cpp
     HostTreeTests.cpp
+    SvgImageCanvasTests.cpp
 )
 
 lumora_add_test(lumora_text_tests SOURCES TextLayoutTests.cpp LINK lumora::text)
