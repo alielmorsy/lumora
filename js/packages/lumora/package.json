@@ -1,0 +1,16 @@
+{
+  "name": "lumora",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": { "lumora": "bin/lumora.js" },
+  "scripts": { "test": "node --test test/" },
+  "dependencies": {
+    "@babel/core": "^7.28.4",
+    "@babel/preset-typescript": "^7.27.1",
+    "babel-preset-solid": "^1.9.9",
+    "esbuild": "^0.25.10"
+  },
+  "devDependencies": {
+    "solid-js": "^1.9.9"
+  }
+}
