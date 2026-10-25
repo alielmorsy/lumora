@@ -1,0 +1,16 @@
+{
+  "name": "hello",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "lumora dev"
+  },
+  "dependencies": {
+    "@lumora/runtime": "^0.1.0",
+    "solid-js": "^1.9.9"
+  },
+  "devDependencies": {
+    "lumora": "^0.1.0",
+    "typescript": "^5.9.3"
+  }
+}
