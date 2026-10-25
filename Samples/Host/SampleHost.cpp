@@ -19,6 +19,11 @@
 #include <lumora/rhi/RHI.h>
 #include <lumora/rhi/RenderThread.h>
 
+#if defined(__EMSCRIPTEN__)
+#include <emscripten.h>
+#include <lumora/rhi/CommandBuffer.h>
+#endif
+
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -55,6 +60,8 @@ int RunHeadless(const SampleDesc& desc, int frames)
     if (!desc.css.empty())
         app.SetStylesheetSource(desc.css);
     for (int f = 0; f < frames; ++f) {
+        if (desc.onFrame)
+            desc.onFrame(app, 1.f / 60.f);
         app.Tick(1.f / 60.f);
         app.Layout(static_cast<float>(desc.width), static_cast<float>(desc.height));
     }
@@ -63,6 +70,7 @@ int RunHeadless(const SampleDesc& desc, int frames)
 }
 
 #if LUMORA_SAMPLE_GPU
+#if !defined(__EMSCRIPTEN__)
 static bool IsPerfEnabled()
 {
 #if defined(__ANDROID__)
@@ -74,6 +82,7 @@ static bool IsPerfEnabled()
     return s && (std::strcmp(s, "1") == 0 || std::strcmp(s, "true") == 0);
 #endif
 }
+#endif
 
 std::vector<std::byte> ReadFile(const char* path)
 {
@@ -86,6 +95,142 @@ std::vector<std::byte> ReadFile(const char* path)
     return bytes;
 }
 
+rhi::NativeWindowHandles ToRhiHandles(const platform::NativeWindowHandle& h)
+{
+    rhi::NativeWindowKind kind = rhi::NativeWindowKind::Win32;
+    if (h.backend == platform::WindowBackend::Android)
+        kind = rhi::NativeWindowKind::Android;
+    else if (h.backend == platform::WindowBackend::Web)
+        kind = rhi::NativeWindowKind::Web;
+    return {.window = h.window, .instance = h.instance, .kind = kind};
+}
+
+#if defined(__EMSCRIPTEN__)
+struct WebApp
+{
+    Ref<platform::Window> window;
+    rhi::RHI device;
+    rhi::SwapchainHandle swapchain;
+    Ref<Lumora> ui;
+    MountedApp* mounted = nullptr;
+    FramePacket packet;
+    bool packetPending = false;
+    Subscription inputSub;
+    Subscription winSub;
+    std::chrono::steady_clock::time_point last = std::chrono::steady_clock::now();
+    int frameCount = 0;
+    int exitAfter = -1;
+    std::function<void(MountedApp&, float)> onFrame;
+};
+
+// One browser frame: the same sequence RenderThread runs, inline on the main thread.
+void WebFrame(void* arg)
+{
+    WebApp& app = *static_cast<WebApp*>(arg);
+    app.window->PumpEvents();
+
+    const rhi::Extent2D canvas{app.window->GetWidth(), app.window->GetHeight()};
+    if (canvas.width == 0 || canvas.height == 0)
+        return;
+
+    if (!app.packetPending) {
+        rhi::Extent2D extent = app.device.Swapchain().GetSwapchainExtent(app.swapchain);
+        if (extent.width != canvas.width || extent.height != canvas.height) {
+            app.device.Swapchain().RecreateSwapchain(app.swapchain, canvas);
+            extent = canvas;
+        }
+
+        const auto now = std::chrono::steady_clock::now();
+        const float dt = std::chrono::duration<float>(now - app.last).count();
+        app.last = now;
+
+        if (app.onFrame && app.mounted)
+            app.onFrame(*app.mounted, dt);
+        app.ui->Update(dt);
+        if (app.mounted)
+            app.window->SetTextInputActive(app.mounted->WantsTextInput());
+        app.ui->Layout(static_cast<float>(extent.width), static_cast<float>(extent.height));
+        app.ui->RecordFrame(app.packet, extent);
+        app.packetPending = true;
+    }
+
+    rhi::FrameContext ctx = app.device.BeginFrame(app.swapchain);
+    if (ctx.swapchainImage.IsValid()) {
+        rhi::CommandBuffer& cmd = *ctx.cmd;
+        cmd.TransitionTexture(ctx.swapchainImage, rhi::ImageLayout::Undefined, rhi::ImageLayout::ColorAttachment);
+        app.ui->RenderFrame(app.packet, cmd, ctx.frameIndex, app.device.Resources().GetDefaultView(ctx.swapchainImage),
+                            app.device.Swapchain().GetSwapchainExtent(app.swapchain), rhi::Color{0.f, 0.f, 0.f, 1.f});
+        cmd.TransitionTexture(ctx.swapchainImage, rhi::ImageLayout::ColorAttachment, rhi::ImageLayout::PresentSrc);
+        app.packetPending = false;
+    }
+    app.device.EndFrame(ctx);
+
+    if (ctx.swapchainOutOfDate)
+        app.device.Swapchain().RecreateSwapchain(app.swapchain, canvas);
+
+    if (app.exitAfter > 0 && ++app.frameCount >= app.exitAfter)
+        emscripten_cancel_main_loop();
+}
+
+// Returns after scheduling the frame loop; the runtime stays alive (-sEXIT_RUNTIME=0) and owns `app`.
+int RunWindowed(const SampleDesc& desc, bool validation, int exitAfter)
+{
+    log::InstallSpdlog();
+
+    if (rhi::EnumerateAdapters().empty()) {
+        LOG_FATAL("This app needs a browser with WebGPU");
+        std::fprintf(stderr, "This app needs a browser with WebGPU\n");
+        return 1;
+    }
+
+    auto* app = new WebApp();
+    app->exitAfter = exitAfter;
+    app->onFrame   = desc.onFrame;
+    app->window = platform::Window::Create(
+        {.title = desc.title, .width = static_cast<uint32_t>(desc.width), .height = static_cast<uint32_t>(desc.height)});
+    app->device.Init({.enableValidation = validation, .enableDebugLabels = validation});
+
+    rhi::SwapchainDescription sc{};
+    sc.nativeWindow = ToRhiHandles(app->window->GetNativeHandle());
+    sc.extent       = {app->window->GetWidth(), app->window->GetHeight()};
+    app->swapchain  = app->device.Swapchain().CreateSwapchain(sc);
+
+    app->ui = MakeLumora({
+        .rhi         = &app->device,
+        .spirvLoader = [](std::string_view name) {
+            auto span = lumora::EmbeddedSpirv(name);
+            return std::vector<std::byte>(span.begin(), span.end());
+        },
+        .colorFormat = app->device.Swapchain().GetSwapchainFormat(app->swapchain),
+    });
+    app->ui->SetContentScale(app->window->GetDpiScale());
+
+    const platform::DefaultFontFiles fontFiles = platform::GetDefaultUiFont();
+    auto regular = ReadFile(fontFiles.regular.string().c_str());
+    auto bold    = ReadFile(fontFiles.bold.string().c_str());
+    if (!regular.empty()) {
+        app->ui->Fonts().RegisterFont(regular, {.family = "Sans"});
+        app->ui->Fonts().SetDefaultFamily("Sans");
+        if (!bold.empty())
+            app->ui->Fonts().RegisterFont(bold, {.family = "Sans", .bold = true});
+    } else {
+        LOG_WARN("No font found at {}", fontFiles.regular.string());
+    }
+
+    app->mounted = app->ui->Mount(desc.root);
+    if (!desc.css.empty())
+        app->ui->SetStylesheetSource(desc.css);
+
+    app->inputSub = app->window->InputEvents().Subscribe([app](const platform::InputEvent& e) { app->ui->Dispatch(e); });
+    app->winSub   = app->window->Events().Subscribe([app](const platform::WindowEvent& e) {
+        if (e.type == platform::WindowEventType::DpiChanged)
+            app->ui->SetContentScale(e.dpiScale);
+    });
+
+    emscripten_set_main_loop_arg(WebFrame, app, 0, false);
+    return 0;
+}
+#else
 struct EventInbox
 {
     std::mutex mutex;
@@ -132,8 +277,7 @@ int RunWindowed(const SampleDesc& desc, bool validation, int exitAfter)
     device.Init({.enableValidation = validation, .enableDebugLabels = validation});
 
     rhi::SwapchainDescription sc{};
-    sc.nativeWindow = {native.window, native.instance,
-                       native.backend == platform::WindowBackend::Android ? rhi::NativeWindowKind::Android : rhi::NativeWindowKind::Win32};
+    sc.nativeWindow = ToRhiHandles(native);
     sc.extent       = {window->GetWidth(), window->GetHeight()};
     const rhi::SwapchainHandle swapchain = device.Swapchain().CreateSwapchain(sc);
 
@@ -168,13 +312,7 @@ int RunWindowed(const SampleDesc& desc, bool validation, int exitAfter)
         } else if (e.type == platform::WindowEventType::SurfaceCreated) {
             std::lock_guard<std::mutex> lk(rtMutex);
             if (activeRenderThread) {
-                const auto curNative = window->GetNativeHandle();
-                rhi::NativeWindowHandles h{
-                    .window = curNative.window,
-                    .instance = curNative.instance,
-                    .kind = curNative.backend == platform::WindowBackend::Android ? rhi::NativeWindowKind::Android : rhi::NativeWindowKind::Win32,
-                };
-                activeRenderThread->SetSurface(h);
+                activeRenderThread->SetSurface(ToRhiHandles(window->GetNativeHandle()));
             }
         } else {
             std::lock_guard<std::mutex> lock(inbox.mutex);
@@ -268,6 +406,9 @@ int RunWindowed(const SampleDesc& desc, bool validation, int exitAfter)
                 const float dt = std::chrono::duration<float>(now - last).count();
                 last = now;
 
+                if (desc.onFrame && mounted) {
+                    desc.onFrame(*mounted, dt);
+                }
                 ui->Update(dt);
                 if (mounted) {
                     window->SetTextInputActive(mounted->WantsTextInput());
@@ -362,6 +503,7 @@ int RunWindowed(const SampleDesc& desc, bool validation, int exitAfter)
     device.Shutdown();
     return 0;
 }
+#endif // __EMSCRIPTEN__
 #endif
 
 } // namespace

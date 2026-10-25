@@ -36,6 +36,8 @@ struct InputCfg {
     /// Space-separated CSS class list (reactive). When the app has a stylesheet, CSS drives
     /// fill/border/radius/color/padding for the field; otherwise the inline props above apply.
     Str                              className{};
+    /// Per-node CSS declarations (`padding: 4px; color: red`); reactive. Beat stylesheet rules except `!important`.
+    Str                              inlineCss{};
 };
 
 /// Text input editor (caret, selection, clipboard, undo/redo). Single-line by default; set multiLine to allow newlines.

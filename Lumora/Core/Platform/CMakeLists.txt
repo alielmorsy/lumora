@@ -43,12 +43,19 @@ elseif (ANDROID)
     else ()
         message(STATUS "lumora_platform: standalone NDK build (game-activity not found), OS-only subset")
     endif ()
+elseif (EMSCRIPTEN)
+    file(GLOB _web CONFIGURE_DEPENDS Source/Web/*.cpp Source/OS/Web/*.cpp)
+    set(_os
+            Source/OS/Posix/Thread.cpp
+            Source/OS/Posix/Process.cpp
+            Source/OS/Posix/DynamicLibrary.cpp
+            Source/OS/Common/Asset.cpp)
 else ()
     message(STATUS "lumora_platform: no backend for ${CMAKE_SYSTEM_NAME}, headless (common sources only)")
     set(_os Source/OS/Posix/Thread.cpp)
 endif ()
 
-add_library(lumora_platform STATIC ${_common} ${_os} ${_windows} ${_android})
+add_library(lumora_platform STATIC ${_common} ${_os} ${_windows} ${_android} ${_web})
 add_library(lumora::platform ALIAS lumora_platform)
 lumora_defaults(lumora_platform)
 

@@ -30,6 +30,7 @@ namespace lumora
             TransformProps transform;
             PositionProps position;
             Reactive<std::string> className;
+            Reactive<std::string> inlineCss;
             struct
             {
                 Reactive<bool> disabled;
@@ -69,6 +70,7 @@ namespace lumora
                     style::StyleEngine* eng = ctx.style;
                     style::BindClass(ctx, id,
                         BoxStyleCfg{cfg.layout, cfg.style, cfg.view, cfg.transform, cfg.position, cfg.className,
+                                    cfg.inlineCss,
                                     {cfg.on.disabled}},
                         [base, eng](NodeArena& a, NodeId n, const style::ComputedStyle& cs, const BoxStyleCfg& c)
                         {

@@ -419,3 +419,87 @@ TEST(StyleApplyTests, DirectionalBordersResolveShorthandsAndLonghands)
     EXPECT_EQ(bSplitC.ColorBottom(), Color::Rgba(0, 0, 255));
     EXPECT_EQ(bSplitC.ColorLeft(), Color::Rgba(255, 255, 0));
 }
+
+TEST(StyleApplyTests, InlineCssBeatsClassRule)
+{
+    StyleHarness h;
+    h.engine.LoadSource(".card { padding: 4px; } ");
+    Owner o;
+    const NodeId id = h.Mount(Box({.className = "card", .inlineCss = "padding: 10px; border-radius: 6px"}), o);
+    EXPECT_EQ(h.Node(id).style.padding.left, 10.f);
+    EXPECT_EQ(h.Style(id).radius, 6.f);
+}
+
+TEST(StyleApplyTests, InlineShorthandReplacesRuleLonghand)
+{
+    StyleHarness h;
+    h.engine.LoadSource(".card { padding-left: 4px; }");
+    Owner o;
+    const NodeId id = h.Mount(Box({.className = "card", .inlineCss = "padding: 10px"}), o);
+    EXPECT_EQ(h.Node(id).style.padding.left, 10.f);
+}
+
+TEST(StyleApplyTests, ImportantRuleBeatsInlineCss)
+{
+    StyleHarness h;
+    h.engine.LoadSource(".card { padding: 4px !important; }");
+    Owner o;
+    const NodeId id = h.Mount(Box({.className = "card", .inlineCss = "padding: 10px"}), o);
+    EXPECT_EQ(h.Node(id).style.padding.left, 4.f);
+}
+
+TEST(StyleApplyTests, ImportantShorthandBeatsInlineLonghand)
+{
+    StyleHarness h;
+    h.engine.LoadSource(".card { padding: 4px !important; }");
+    Owner o;
+    const NodeId id = h.Mount(Box({.className = "card", .inlineCss = "padding-left: 10px"}), o);
+    EXPECT_EQ(h.Node(id).style.padding.left, 4.f);
+}
+
+TEST(StyleApplyTests, InlineCssIsReactive)
+{
+    StyleHarness h;
+    h.engine.LoadSource("");
+    Signal<std::string> css{std::string("width: 20px")};
+    Owner o;
+    const NodeId id = h.Mount(Box({.inlineCss = css}), o);
+    EXPECT_EQ(h.Node(id).style.width, Fixed(20));
+    css = std::string("width: 40px");
+    EXPECT_EQ(h.Node(id).style.width, Fixed(40));
+    css = std::string("");
+    EXPECT_EQ(h.Node(id).style.width, Wrap);
+}
+
+TEST(StyleApplyTests, MalformedInlineCssIsIgnored)
+{
+    StyleHarness h;
+    h.engine.LoadSource("");
+    Owner o;
+    const NodeId id = h.Mount(Box({.inlineCss = "padding: ; ;; color red"}), o);
+    EXPECT_EQ(h.Node(id).style.padding.left, 0.f);
+}
+
+TEST(StyleApplyTests, ImageTakesClassAndInlineSize)
+{
+    StyleHarness h;
+    h.engine.LoadSource(".pic { width: 64px; }");
+    Owner o;
+    const NodeId id = h.Mount(Image({.className = "pic", .inlineCss = "height: 32px"}), o);
+    EXPECT_EQ(h.Node(id).style.width, Fixed(64));
+    EXPECT_EQ(h.Node(id).style.height, Fixed(32));
+}
+
+TEST(StyleApplyTests, TextAndInputTakeInlineCss)
+{
+    StyleHarness h;
+    h.engine.LoadSource("");
+    Owner o;
+    const NodeId t = h.Mount(Text("hi", {.inlineCss = "width: 50px"}), o);
+    EXPECT_EQ(h.Node(t).style.width, Fixed(50));
+    Signal<std::string> text{std::string{}};
+    const NodeId i = h.Mount(Input({.value = text, .inlineCss = "width: 70px"}), o);
+    EXPECT_EQ(h.Node(i).style.width, Fixed(70));
+    const NodeId s = h.Mount(Scroll({.inlineCss = "width: 90px"}), o);
+    EXPECT_EQ(h.Node(s).style.width, Fixed(90));
+}

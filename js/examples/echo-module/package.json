@@ -1,0 +1,15 @@
+{
+  "name": "@lumora-examples/echo-module",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "peerDependencies": {
+    "@lumora/runtime": "^0.1.0"
+  },
+  "lumora": {
+    "module": "Echo",
+    "cpp": { "dir": "native/cpp", "target": "lumora_echo" }
+  }
+}

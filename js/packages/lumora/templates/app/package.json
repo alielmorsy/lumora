@@ -1,0 +1,17 @@
+{
+  "name": "{{name}}",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "lumora dev",
+    "android": "lumora android"
+  },
+  "dependencies": {
+    "@lumora/runtime": "^{{runtimeVersion}}",
+    "solid-js": "^1.9.9"
+  },
+  "devDependencies": {
+    "lumora": "^{{runtimeVersion}}",
+    "typescript": "^5.9.3"
+  }
+}

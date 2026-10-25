@@ -134,7 +134,7 @@ struct DescriptorWrite {
 
 struct ShaderStageDesc {
     ShaderStageFlags           stage = ShaderStageFlags::None;
-    std::span<const std::byte> spirv;
+    std::span<const std::byte> code; // SPIR-V on Vulkan, UTF-8 WGSL on WebGPU
     std::string_view           entryPoint = "main";
     std::string_view           debugName  = {};
 };
@@ -253,9 +253,9 @@ struct BufferBarrier {
 
 // ---- Swapchain ----
 
-enum class NativeWindowKind : uint8_t { Win32, Android };
+enum class NativeWindowKind : uint8_t { Win32, Android, Web };
 
-// Win32: window = HWND, instance = HINSTANCE. Android: window = ANativeWindow*.
+// Win32: window = HWND, instance = HINSTANCE. Android: window = ANativeWindow*. Web: window = const char* canvas CSS selector.
 struct NativeWindowHandles {
     void*            window   = nullptr;
     void*            instance = nullptr;

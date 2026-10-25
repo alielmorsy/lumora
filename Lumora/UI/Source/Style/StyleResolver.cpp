@@ -9,10 +9,10 @@ namespace lumora::style
         LayoutStyle& ls = arena.Resolve(id).style;
         ls.width = cs.Get("width"_sid) ? ToSizeHint(*cs.Get("width"_sid), Wrap) : layout.width.Get();
         ls.height = cs.Get("height"_sid) ? ToSizeHint(*cs.Get("height"_sid), Wrap) : layout.height.Get();
-        ls.minWidth = cs.Get("min-width"_sid) ? ToSizeHint(*cs.Get("min-width"_sid), Wrap) : Wrap;
-        ls.minHeight = cs.Get("min-height"_sid) ? ToSizeHint(*cs.Get("min-height"_sid), Wrap) : Wrap;
-        ls.maxWidth = cs.Get("max-width"_sid) ? ToSizeHint(*cs.Get("max-width"_sid), Wrap) : Wrap;
-        ls.maxHeight = cs.Get("max-height"_sid) ? ToSizeHint(*cs.Get("max-height"_sid), Wrap) : Wrap;
+        ls.minWidth = cs.Get("min-width"_sid) ? ToSizeHint(*cs.Get("min-width"_sid), Wrap) : layout.minWidth;
+        ls.minHeight = cs.Get("min-height"_sid) ? ToSizeHint(*cs.Get("min-height"_sid), Wrap) : layout.minHeight;
+        ls.maxWidth = cs.Get("max-width"_sid) ? ToSizeHint(*cs.Get("max-width"_sid), Wrap) : layout.maxWidth;
+        ls.maxHeight = cs.Get("max-height"_sid) ? ToSizeHint(*cs.Get("max-height"_sid), Wrap) : layout.maxHeight;
         {
             const SpacingSplit s = ToPaddingSplit(cs, layout.padding);
             ls.padding = s.px;

@@ -65,7 +65,7 @@ namespace lumora
                     BindInteractProps<TextPayload>(ctx, id, data.cfg.on, &TextPayload::on);
                     const TextCfg& c = data.cfg;
                     style::BindClass(ctx, id,
-                        style::TextStyleCfg{c.size, c.color, c.font, c.flow, c.layout, c.className, {c.on.disabled}},
+                        style::TextStyleCfg{c.size, c.color, c.font, c.flow, c.layout, c.className, c.inlineCss, {c.on.disabled}},
                         [](NodeArena& a, NodeId n, const style::ComputedStyle& cs, const style::TextStyleCfg& c)
                         {
                             style::ApplyText(a, n, cs, c);

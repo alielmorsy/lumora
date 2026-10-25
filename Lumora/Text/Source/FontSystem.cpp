@@ -517,19 +517,25 @@ namespace lumora
                 return layout;
             }
 
-            // 1. bidi levels (SheenBidi over UTF-32, base direction auto with LTR default).
+            // 1. bidi levels (SheenBidi over UTF-32, base direction auto with LTR default), one paragraph per separator.
             std::vector<std::uint8_t> levels(static_cast<std::size_t>(n), 0);
             {
                 SBCodepointSequence seq{SBStringEncodingUTF32, cps.data(), static_cast<SBUInteger>(n)};
                 SBAlgorithmRef algo = SBAlgorithmCreate(&seq);
-                SBParagraphRef para =
-                    SBAlgorithmCreateParagraph(algo, 0, static_cast<SBUInteger>(n), SBLevelDefaultLTR);
-                const SBLevel* lv = SBParagraphGetLevelsPtr(para);
-                for (int i = 0; i < n; ++i)
+                SBUInteger offset = 0;
+                while (offset < static_cast<SBUInteger>(n))
                 {
-                    levels[static_cast<std::size_t>(i)] = static_cast<std::uint8_t>(lv[i]);
+                    SBParagraphRef para = SBAlgorithmCreateParagraph(algo, offset, static_cast<SBUInteger>(n) - offset,
+                                                                     SBLevelDefaultLTR);
+                    const SBUInteger len = SBParagraphGetLength(para);
+                    const SBLevel* lv = SBParagraphGetLevelsPtr(para);
+                    for (SBUInteger i = 0; i < len; ++i)
+                    {
+                        levels[static_cast<std::size_t>(offset + i)] = static_cast<std::uint8_t>(lv[i]);
+                    }
+                    SBParagraphRelease(para);
+                    offset += len;
                 }
-                SBParagraphRelease(para);
                 SBAlgorithmRelease(algo);
             }
 
@@ -754,6 +760,13 @@ namespace lumora
                     for (int gi = s.first; gi < s.last; ++gi)
                     {
                         const ShapedGlyph& g = s.run->glyphs[static_cast<std::size_t>(gi)];
+                        // Line-break controls end the line; fonts without a blank glyph for them would draw .notdef.
+                        const std::uint32_t cp = cps[g.cluster];
+                        if (cp == '\n' || cp == '\r' || cp == '\v' || cp == '\f' || cp == 0x85 || cp == 0x2028 ||
+                            cp == 0x2029)
+                        {
+                            continue;
+                        }
                         bl.glyphs.push_back(
                             PositionedGlyph{s.run->faceIdx, g.glyph, x + g.xOffset, baseline - g.yOffset, g.advance});
                         x += g.advance;

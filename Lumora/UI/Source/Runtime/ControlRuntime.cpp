@@ -69,6 +69,36 @@ namespace lumora
         parent.MarkDirty(Dirty::Repaint); // the emitted child list shrank: the parent must re-record it
     }
 
+    void InsertChildBefore(NodeArena& arena, NodeId parentId, NodeId childId, NodeId beforeId)
+    {
+        if (!beforeId.Valid())
+        {
+            AppendChild(arena, parentId, childId);
+            return;
+        }
+        LiveNode& before = arena.Resolve(beforeId);
+        const NodeId prev = before.prevSibling;
+        before.prevSibling = childId;
+
+        LiveNode& child = arena.Resolve(childId);
+        child.parent = parentId;
+        child.prevSibling = prev;
+        child.nextSibling = beforeId;
+
+        LiveNode& parent = arena.Resolve(parentId);
+        if (prev.Valid())
+        {
+            arena.Resolve(prev).nextSibling = childId;
+        }
+        else
+        {
+            parent.firstChild = childId;
+        }
+        ++parent.childCount;
+        parent.MarkDirty(Dirty::Repaint);
+        arena.Resolve(childId).MarkDirty(Dirty::Repaint);
+    }
+
     void SetChildOrder(NodeArena& arena, NodeId parentId, std::span<const NodeId> order)
     {
         LiveNode& parent = arena.Resolve(parentId);
@@ -119,9 +149,9 @@ namespace lumora
         }
     } // namespace
 
-    MountedBody MountBody(AppCtx& ctx, NodeId controlId, const std::function<Elem()>& builder)
+    MountedBody MountBody(AppCtx& ctx, NodeId controlId, const std::function<Elem()>& builder, Owner* scopeParent)
     {
-        Owner* parentScope = ctx.arena.Resolve(controlId).scope;
+        Owner* parentScope = scopeParent ? scopeParent : ctx.arena.Resolve(controlId).scope;
         auto scope = std::make_unique<Owner>(parentScope, Dormant);
 
         Elem elem = RunBuilder(*scope, builder);

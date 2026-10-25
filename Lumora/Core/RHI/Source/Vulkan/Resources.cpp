@@ -174,6 +174,14 @@ void* RHIResources::GetMappedPointer(BufferHandle buffer) const
     return nullptr;
 }
 
+void RHIResources::FlushMapped(BufferHandle buffer, uint64_t offset, uint64_t size)
+{
+    if (!_n)
+        return;
+    if (const detail::Buffer* b = _n->buffers.Get(buffer); b && b->mapped)
+        vmaFlushAllocation(_n->allocator, b->alloc, offset, size);
+}
+
 TextureDescription RHIResources::GetTextureDescription(TextureHandle texture) const
 {
     if (!_n)

@@ -50,8 +50,8 @@ PipelineHandle RHIPipelines::CreatePipeline(const PipelineDescription& desc)
 
     for (const auto& s : desc.stages) {
         VkShaderModuleCreateInfo smci{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
-        smci.codeSize = s.spirv.size();
-        smci.pCode    = reinterpret_cast<const uint32_t*>(s.spirv.data());
+        smci.codeSize = s.code.size();
+        smci.pCode    = reinterpret_cast<const uint32_t*>(s.code.data());
         VkShaderModule mod = VK_NULL_HANDLE;
         LUMORA_VK_CHECK(vkCreateShaderModule(n.device, &smci, nullptr, &mod));
         modules.push_back(mod);

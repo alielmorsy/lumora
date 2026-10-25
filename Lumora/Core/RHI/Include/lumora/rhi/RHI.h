@@ -27,6 +27,8 @@ public:
     TextureViewHandle GetDefaultView(TextureHandle texture);
     // Null unless the buffer is CpuToGpuMapped or GpuToCpu.
     [[nodiscard]] void* GetMappedPointer(BufferHandle buffer) const;
+    // Publishes CPU writes made through GetMappedPointer to the GPU. Call after writing, before the frame that reads them.
+    void FlushMapped(BufferHandle buffer, uint64_t offset, uint64_t size);
     [[nodiscard]] TextureDescription GetTextureDescription(TextureHandle texture) const;
 
     void Destroy(BufferHandle h);

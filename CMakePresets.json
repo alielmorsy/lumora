@@ -11,20 +11,32 @@
       "name": "debug",
       "displayName": "Debug",
       "inherits": "base",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
     },
     {
       "name": "release",
       "displayName": "Release",
       "inherits": "base",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
     },
     {
       "name": "linux-base",
       "hidden": true,
       "inherits": "base",
-      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
-      "cacheVariables": { "LUMORA_BUILD_GPU": "OFF", "LUMORA_BUILD_SAMPLES": "OFF" }
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "LUMORA_BUILD_GPU": "OFF",
+        "LUMORA_BUILD_SAMPLES": "OFF",
+        "LUMORA_BUILD_SCRIPT": "OFF"
+      }
     },
     {
       "name": "linux-profile",
@@ -46,28 +58,75 @@
         "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
         "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address,undefined"
       }
+    },
+    {
+      "name": "web",
+      "displayName": "Web (Emscripten + WebGPU)",
+      "inherits": "base",
+      "toolchainFile": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "LUMORA_BUILD_BENCHMARKS": "OFF",
+        "CMAKE_CROSSCOMPILING_EMULATOR": "node"
+      }
     }
   ],
   "buildPresets": [
-    { "name": "debug", "configurePreset": "debug" },
-    { "name": "release", "configurePreset": "release" },
-    { "name": "linux-profile", "configurePreset": "linux-profile" },
-    { "name": "linux-asan", "configurePreset": "linux-asan" }
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    },
+    {
+      "name": "linux-profile",
+      "configurePreset": "linux-profile"
+    },
+    {
+      "name": "linux-asan",
+      "configurePreset": "linux-asan"
+    },
+    {
+      "name": "web",
+      "configurePreset": "web"
+    }
   ],
   "testPresets": [
     {
       "name": "debug",
       "configurePreset": "debug",
-      "output": { "outputOnFailure": true },
-      "execution": { "jobs": 8 },
-      "environment": { "LUMORA_NO_DIALOGS": "1" }
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 8
+      },
+      "environment": {
+        "LUMORA_NO_DIALOGS": "1"
+      }
     },
     {
       "name": "linux-asan",
       "configurePreset": "linux-asan",
-      "output": { "outputOnFailure": true },
-      "execution": { "jobs": 8 },
-      "environment": { "LUMORA_NO_DIALOGS": "1", "UBSAN_OPTIONS": "print_stacktrace=1" }
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 8
+      },
+      "environment": {
+        "LUMORA_NO_DIALOGS": "1",
+        "UBSAN_OPTIONS": "print_stacktrace=1"
+      }
+    },
+    {
+      "name": "web",
+      "configurePreset": "web",
+      "output": {
+        "outputOnFailure": true
+      }
     }
   ]
 }

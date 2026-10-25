@@ -1,5 +1,9 @@
 #include "Style/Cascade.h"
 
+#include <lumora/Style/Css.h>
+
+#include <string>
+
 #include <algorithm>
 #include <array>
 #include <unordered_set>
@@ -132,9 +136,52 @@ namespace lumora::style
         ComputedStyle out;
         for (auto& [prop, win] : best)
         {
+            if (win.important) out.important.push_back(prop);
             if (win.custom) out.customProps.emplace(prop, std::move(win.value));
             else out.props.emplace(prop, std::move(win.value));
         }
         return out;
+    }
+
+    std::vector<Declaration> ParseInlineDeclarations(std::string_view css)
+    {
+        Stylesheet sheet = ParseStylesheet(".x{" + std::string(css) + "}");
+        if (sheet.rules.empty()) return {};
+        return std::move(sheet.rules.front().declarations);
+    }
+
+    void ApplyDeclarations(ComputedStyle& cs, std::span<const Declaration> decls)
+    {
+        const auto isImportant = [&](StringId prop)
+        {
+            return std::ranges::find(cs.important, prop) != cs.important.end();
+        };
+        for (const Declaration& d : decls)
+        {
+            if (!d.important)
+            {
+                bool shielded = isImportant(d.prop);
+                for (const ShorthandFamily& family : kShorthandFamilies)
+                {
+                    shielded |= isImportant(family.shorthand) &&
+                        std::ranges::find(family.longhands, d.prop) != family.longhands.end();
+                }
+                if (shielded) continue;
+            }
+            if (d.custom)
+            {
+                cs.customProps[d.prop] = d.value;
+                continue;
+            }
+            for (const ShorthandFamily& family : kShorthandFamilies)
+            {
+                if (family.shorthand != d.prop) continue;
+                for (const StringId longhand : family.longhands)
+                {
+                    if (longhand != StringId{} && !isImportant(longhand)) cs.props.erase(longhand);
+                }
+            }
+            cs.props[d.prop] = d.value;
+        }
     }
 } // namespace lumora::style

@@ -22,6 +22,7 @@ class TextMeasurer;
 class Clipboard;
 class MenuBarController;
 class ImageProvider;
+class HostTree;
 struct Event;
 
 /// One mounted Lumora tree: owns its reactive graph, node arena, layout tree and root scope. Created by the Lumora
@@ -110,6 +111,9 @@ public:
     /// Run `fn` with this app's graph ambient, root owner current and writes batched. Host code outside the frame methods
     /// needs this to create or write signals (no ambient graph: no subscriptions; no owner: Effect/OnFrame dropped).
     void RunScoped(const std::function<void()>& fn);
+
+    /// Imperative node tree rooted at the app's root node, for script renderers. Created on first call; lives as long as the app.
+    [[nodiscard]] HostTree& Host();
 
     /// The auto-mounted menubar model; the runtime pins its bar to the window top and provides it via MenuBarCtx.
     [[nodiscard]] MenuBarController& MenuBar();
