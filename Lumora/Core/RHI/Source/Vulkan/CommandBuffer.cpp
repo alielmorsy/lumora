@@ -570,6 +570,44 @@ void CommandBuffer::CopyBufferToImage(BufferHandle src, TextureHandle dst, Image
                            static_cast<uint32_t>(vkRegions.size()), vkRegions.data());
 }
 
+void CommandBuffer::CopyImageToBuffer(TextureHandle src, ImageLayout srcLayout, BufferHandle dst,
+                                      std::span<const BufferImageCopy> regions)
+{
+    if (!_rhi || !_cmd || regions.empty())
+        return;
+    detail::Texture* t = _rhi->textures.Get(src);
+    if (!t) {
+        LOG_INVALID_HANDLE_ONCE("texture", src);
+        return;
+    }
+    detail::Buffer* b = _rhi->buffers.Get(dst);
+    if (!b) {
+        LOG_INVALID_HANDLE_ONCE("buffer", dst);
+        return;
+    }
+
+    std::vector<VkBufferImageCopy> vkRegions;
+    vkRegions.reserve(regions.size());
+    const VkImageAspectFlags aspect = detail::AspectOf(t->desc.format);
+
+    for (const auto& r : regions) {
+        VkBufferImageCopy bic{};
+        bic.bufferOffset                    = r.bufferOffset;
+        bic.bufferRowLength                 = r.bufferRowLength;
+        bic.bufferImageHeight               = r.bufferImageHeight;
+        bic.imageSubresource.aspectMask     = aspect;
+        bic.imageSubresource.mipLevel       = r.mipLevel;
+        bic.imageSubresource.baseArrayLayer = r.baseArrayLayer;
+        bic.imageSubresource.layerCount     = r.layerCount;
+        bic.imageOffset                     = {r.imageOffset.x, r.imageOffset.y, r.imageOffset.z};
+        bic.imageExtent                     = {r.imageExtent.width, r.imageExtent.height, r.imageExtent.depth};
+        vkRegions.push_back(bic);
+    }
+
+    vkCmdCopyImageToBuffer(static_cast<VkCommandBuffer>(_cmd), t->image, detail::ToVk(srcLayout), b->buffer,
+                           static_cast<uint32_t>(vkRegions.size()), vkRegions.data());
+}
+
 void CommandBuffer::BeginDebugLabel(std::string_view name, Color color)
 {
     if (!_rhi || !_cmd || !_rhi->debugLabels || !_rhi->cmdBeginLabel)

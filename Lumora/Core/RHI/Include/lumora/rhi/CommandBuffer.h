@@ -57,6 +57,9 @@ public:
 
     void CopyBufferToImage(BufferHandle src, TextureHandle dst, ImageLayout dstLayout,
                            std::span<const BufferImageCopy> regions);
+    // Texture needs TransferSrc usage, buffer TransferDst + GpuToCpu. Row length 0 means tightly packed.
+    void CopyImageToBuffer(TextureHandle src, ImageLayout srcLayout, BufferHandle dst,
+                           std::span<const BufferImageCopy> regions);
 
     void BeginDebugLabel(std::string_view name, Color color);
     void EndDebugLabel();
