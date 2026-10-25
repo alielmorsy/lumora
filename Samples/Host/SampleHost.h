@@ -6,6 +6,10 @@
 #include <functional>
 #include <string>
 
+namespace lumora {
+class MountedApp;
+}
+
 namespace lumora::samples {
 
 struct SampleDesc {
@@ -14,6 +18,8 @@ struct SampleDesc {
     int height = 800;
     std::function<Elem()> root;
     std::string css;
+    /// Once per frame on the thread that ticks the app, after input dispatch and before Update/Tick. Null = no-op.
+    std::function<void(MountedApp&, float dt)> onFrame;
 };
 
 // Runs the sample. Today: headless (mount, tick, layout). Later: window + RHI, same signature.

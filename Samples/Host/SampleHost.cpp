@@ -60,6 +60,8 @@ int RunHeadless(const SampleDesc& desc, int frames)
     if (!desc.css.empty())
         app.SetStylesheetSource(desc.css);
     for (int f = 0; f < frames; ++f) {
+        if (desc.onFrame)
+            desc.onFrame(app, 1.f / 60.f);
         app.Tick(1.f / 60.f);
         app.Layout(static_cast<float>(desc.width), static_cast<float>(desc.height));
     }
@@ -118,6 +120,7 @@ struct WebApp
     std::chrono::steady_clock::time_point last = std::chrono::steady_clock::now();
     int frameCount = 0;
     int exitAfter = -1;
+    std::function<void(MountedApp&, float)> onFrame;
 };
 
 // One browser frame: the same sequence RenderThread runs, inline on the main thread.
@@ -141,6 +144,8 @@ void WebFrame(void* arg)
         const float dt = std::chrono::duration<float>(now - app.last).count();
         app.last = now;
 
+        if (app.onFrame && app.mounted)
+            app.onFrame(*app.mounted, dt);
         app.ui->Update(dt);
         if (app.mounted)
             app.window->SetTextInputActive(app.mounted->WantsTextInput());
@@ -180,6 +185,7 @@ int RunWindowed(const SampleDesc& desc, bool validation, int exitAfter)
 
     auto* app = new WebApp();
     app->exitAfter = exitAfter;
+    app->onFrame   = desc.onFrame;
     app->window = platform::Window::Create(
         {.title = desc.title, .width = static_cast<uint32_t>(desc.width), .height = static_cast<uint32_t>(desc.height)});
     app->device.Init({.enableValidation = validation, .enableDebugLabels = validation});
@@ -400,6 +406,9 @@ int RunWindowed(const SampleDesc& desc, bool validation, int exitAfter)
                 const float dt = std::chrono::duration<float>(now - last).count();
                 last = now;
 
+                if (desc.onFrame && mounted) {
+                    desc.onFrame(*mounted, dt);
+                }
                 ui->Update(dt);
                 if (mounted) {
                     window->SetTextInputActive(mounted->WantsTextInput());
