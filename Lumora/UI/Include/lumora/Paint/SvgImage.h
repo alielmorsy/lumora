@@ -11,6 +11,7 @@
 
 namespace lumora
 {
+    class Canvas;
     class Paint2D;
 
     namespace detail
@@ -37,8 +38,15 @@ namespace lumora
         [[nodiscard]] bool Valid() const noexcept;
         [[nodiscard]] Vec2 Intrinsic() const noexcept; ///< root width/height attrs, else viewBox size
 
+        [[nodiscard]] Rect ViewBox() const noexcept; ///< root viewBox (x, y, w, h), else {0, 0, Intrinsic()}
+
         /// Replay into `box` (Paint2D layer-local pixels), clipped to it; `opacity` multiplies the document opacity.
         void Draw(Paint2D& surface, const Rect& box, float opacity = 1.f,
+                  SvgAlign align = SvgAlign::XMidYMid,
+                  SvgMeetOrSlice meetOrSlice = SvgMeetOrSlice::Meet) const;
+
+        /// Same replay onto a raw Canvas; `contentScale` is the DPI scale used to pick tessellation density.
+        void Draw(Canvas& canvas, const Rect& box, float opacity = 1.f, float contentScale = 1.f,
                   SvgAlign align = SvgAlign::XMidYMid,
                   SvgMeetOrSlice meetOrSlice = SvgMeetOrSlice::Meet) const;
 

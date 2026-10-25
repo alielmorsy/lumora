@@ -1,5 +1,6 @@
 #include <lumora/Paint/Paint2D.h>
 
+#include "Paint/CanvasStroke.h"
 #include "Runtime/Paint.h"
 #include "Svg/SvgTessellate.h"
 #include "Widgets/TextEmit.h"
@@ -325,6 +326,21 @@ namespace lumora
         }
     } // namespace
 
+    void DrawPolylineOnCanvas(Canvas& canvas, std::vector<PaintVertex>& scratch, std::span<const Vec2> points,
+                              Color color, float width, bool closed, LineJoin join, LineCap cap)
+    {
+        if (points.size() < 2)
+        {
+            return;
+        }
+        scratch.clear();
+        StrokePolyline(scratch, points, color, width, closed, join, cap);
+        if (!scratch.empty())
+        {
+            canvas.DrawTriangles(scratch);
+        }
+    }
+
     std::vector<PaintVertex>& Paint2D::Scratch(std::size_t reserveHint)
     {
         m_scratch.clear();
@@ -484,16 +500,7 @@ namespace lumora
     void Paint2D::DrawPolyline(std::span<const Vec2> points, Color color, float width, bool closed,
                                LineJoin join, LineCap cap)
     {
-        if (points.size() < 2)
-        {
-            return;
-        }
-        std::vector<PaintVertex>& v = Scratch(points.size() * 18);
-        StrokePolyline(v, points, color, width, closed, join, cap);
-        if (!v.empty())
-        {
-            m_canvas.DrawTriangles(v);
-        }
+        DrawPolylineOnCanvas(m_canvas, Scratch(points.size() * 18), points, color, width, closed, join, cap);
     }
 
     void Paint2D::FillPolygon(std::span<const Vec2> points, Color fill)
