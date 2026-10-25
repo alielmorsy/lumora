@@ -18,7 +18,7 @@ namespace lumora::svg
     /// Triangles only for one closed polygon: no boundary pass, no contour copy, mesh buckets sized to the input.
     void TessellatePolygon(std::span<const Vec2> pts, FillRule rule, std::vector<Vec2>& outTris);
 
-    /// Subdivide triangles so no edge exceeds `maxEdge` (document space) - for smooth per-vertex
-    /// gradient colour across large fills. Writes to `out`.
-    void SubdivideTris(const std::vector<Vec2>& in, float maxEdge, std::vector<Vec2>& out);
+    /// Subdivide a fill's triangles and boundary loops in place so no edge exceeds `maxEdge` (document space), for smooth
+    /// per-vertex gradient colour across large fills. Watertight: shared edges split identically.
+    void SubdivideFill(std::vector<Vec2>& tris, std::vector<FlatContour>& boundary, float maxEdge);
 } // namespace lumora::svg

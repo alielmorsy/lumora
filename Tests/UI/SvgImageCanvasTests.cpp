@@ -3,6 +3,10 @@
 #include <lumora/Paint/Canvas.h>
 #include <lumora/Paint/SvgImage.h>
 
+#include <algorithm>
+#include <cstdint>
+#include <cstring>
+#include <map>
 #include <set>
 #include <vector>
 
@@ -80,4 +84,60 @@ TEST(SvgImageCanvas, GradientFill) {
         colours.insert(static_cast<std::uint32_t>(v.col.r) << 16 | static_cast<std::uint32_t>(v.col.g) << 8 | v.col.b);
     }
     EXPECT_GT(colours.size(), 1u);
+}
+
+namespace {
+
+// Every fill edge must be shared by exactly two triangles; a lone edge inside the shape is a T-junction, which rasterizes
+// as pinhole cracks. Only the feather ribbon's outer rim (alpha 0 at both ends) is a true border.
+int OpenFillEdges(const std::vector<PaintVertex>& verts) {
+    using Key = std::pair<std::uint64_t, std::uint64_t>;
+    const auto bits = [](Vec2 p) {
+        std::uint32_t x, y;
+        std::memcpy(&x, &p.x, 4);
+        std::memcpy(&y, &p.y, 4);
+        return static_cast<std::uint64_t>(x) << 32 | y;
+    };
+    std::map<Key, int> edges;
+    for (std::size_t t = 0; t + 2 < verts.size(); t += 3) {
+        for (int e = 0; e < 3; ++e) {
+            const PaintVertex& a = verts[t + e];
+            const PaintVertex& b = verts[t + (e + 1) % 3];
+            if (a.col.a == 0 && b.col.a == 0) {
+                continue;
+            }
+            const std::uint64_t ka = bits(a.pos), kb = bits(b.pos);
+            ++edges[{std::min(ka, kb), std::max(ka, kb)}];
+        }
+    }
+    int open = 0;
+    for (const auto& [k, n] : edges) {
+        open += n != 2;
+    }
+    return open;
+}
+
+constexpr const char* kWax =
+    R"svg(<svg xmlns="http://www.w3.org/2000/svg" viewBox="-176 -172 352 352"><defs><radialGradient id="g0" gradientUnits="userSpaceOnUse" cx="-50" cy="-60" r="260"><stop offset="0" stop-color="#b5233a"/><stop offset="0.5" stop-color="#8e1424"/><stop offset="1" stop-color="#5e0b17"/></radialGradient></defs><path d="M 0 -170 C 95 -175 168 -100 172 -10 C 176 80 110 165 5 172 C -90 178 -170 110 -174 10 C -178 -85 -100 -165 0 -170 Z" fill="url(#g0)"/></svg>)svg";
+
+} // namespace
+
+TEST(SvgImageCanvas, SolidFillMeshIsWatertight) {
+    const SvgImage img = SvgImage::FromText(
+        "<svg viewBox='-176 -172 352 352'><path d='M 0 -170 C 95 -175 168 -100 172 -10 C 176 80 110 165 5 172 "
+        "C -90 178 -170 110 -174 10 C -178 -85 -100 -165 0 -170 Z' fill='#b5233a'/></svg>");
+    VertexCanvas canvas;
+    img.Draw(canvas, img.ViewBox(), 1.f, 1.06f);
+    ASSERT_GT(canvas.verts.size(), 0u);
+    EXPECT_EQ(OpenFillEdges(canvas.verts), 0);
+}
+
+TEST(SvgImageCanvas, GradientFillMeshIsWatertight) {
+    const SvgImage img = SvgImage::FromText(kWax);
+    for (const float scale : {0.5f, 1.f, 1.06f, 2.3f}) {
+        VertexCanvas canvas;
+        img.Draw(canvas, img.ViewBox(), 1.f, scale);
+        ASSERT_GT(canvas.verts.size(), 0u);
+        EXPECT_EQ(OpenFillEdges(canvas.verts), 0) << "scale " << scale;
+    }
 }

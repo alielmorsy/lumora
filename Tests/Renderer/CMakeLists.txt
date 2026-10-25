@@ -7,3 +7,7 @@ target_include_directories(lumora_batch_tests PRIVATE ${_renderer_source})
 lumora_add_test(lumora_shared_image_tests SOURCES SharedImageTests.cpp LINK lumora::renderer lumora_rhi)
 
 lumora_add_test(lumora_frame_packet_tests SOURCES FramePacketTests.cpp LINK lumora::renderer lumora_rhi lumora::platform)
+
+if (TARGET lumora_shaders_embedded)
+    lumora_add_test(lumora_svg_raster_tests SOURCES SvgRasterTests.cpp LINK lumora::renderer lumora_rhi lumora::shaders::embedded)
+endif ()

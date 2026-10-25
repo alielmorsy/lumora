@@ -357,10 +357,7 @@ namespace lumora::svg
 
                 if (op.paint.kind == PaintKind::Gradient)
                 {
-                    const float       maxEdgeDoc = kGradMaxEdgePx / std::max(deviceScale, 0.01f);
-                    std::vector<Vec2> sub;
-                    SubdivideTris(tris, maxEdgeDoc, sub);
-                    tris.swap(sub);
+                    SubdivideFill(tris, boundary, kGradMaxEdgePx / std::max(deviceScale, 0.01f));
                 }
 
                 const auto sample = [&](Vec2 docp) {
