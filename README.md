@@ -61,88 +61,11 @@ Executable samples under `Samples/`:
 - **Pulse**: Real-time observability dashboard displaying streaming traffic charts, animated gauges, heatmaps, live metric grids, and event feeds.
 - **Vitals**: Mobile health and wellness interface featuring tab navigation (Today, Activity, Sleep, Profile), bottom navigation, cards, bottom sheets, FAB, and accent color themes.
 
-## Example
+![Gallery](docs/screenshots/Gallery.png)
 
-Lumora pairs reactive C++ components with CSS stylesheets:
+![Pulse](docs/screenshots/Pulse.png)
 
-```cpp
-#include <lumora/Reactive/Signal.h>
-#include <lumora/Reactive/Format.h>
-#include <lumora/Widgets/Widgets.h>
-
-using namespace lumora;
-
-Elem CounterCard()
-{
-    Signal<int> count{0};
-
-    return Column({.className = "card"},
-        Text("Counter Card", {.className = "title"}),
-        Text(Format("Clicked {} times", count), {.className = "subtitle"}),
-        Row({.className = "button-row"},
-            Button({.label = "Increment", .onClick = [count] { count += 1; }, .className = "btn"}),
-            Button({.label = "Reset",     .onClick = [count] { count = 0;  }, .className = "btn reset"}))
-    );
-}
-```
-
-```css
-/* theme.css */
-:root {
-    --bg-card: #18191f;
-    --border-color: #2e303b;
-    --text-primary: #ffffff;
-    --text-muted: #8b8d98;
-    --accent: #4c8dff;
-    --accent-hover: #6ca0ff;
-}
-
-.card {
-    background-color: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 16px;
-    gap: 12px;
-    transition: transform 0.15s ease-out;
-}
-
-.card:hover {
-    border-color: var(--accent);
-    transform: translateY(-2px);
-}
-
-.card > .title {
-    color: var(--text-primary);
-    font-size: 16px;
-    font-weight: bold;
-}
-
-.card > .subtitle {
-    color: var(--text-muted);
-    font-size: 13px;
-}
-
-.button-row {
-    flex-direction: row;
-    gap: 8px;
-}
-
-.btn {
-    background-color: var(--accent);
-    color: #ffffff;
-    border-radius: 4px;
-    padding: 8px 14px;
-    transition: background-color 0.15s ease;
-}
-
-.btn:hover {
-    background-color: var(--accent-hover);
-}
-
-.btn.reset {
-    background-color: #323541;
-}
-```
+<img src="docs/screenshots/Vitals.png" alt="Vitals" width="360">
 
 ## ThirdParty
 
