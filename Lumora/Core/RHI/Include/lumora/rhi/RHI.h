@@ -29,6 +29,8 @@ public:
     [[nodiscard]] void* GetMappedPointer(BufferHandle buffer) const;
     // Publishes CPU writes made through GetMappedPointer to the GPU. Call after writing, before the frame that reads them.
     void FlushMapped(BufferHandle buffer, uint64_t offset, uint64_t size);
+    // Makes GPU writes to a GpuToCpu buffer visible to GetMappedPointer reads. Call after the fence wait, before reading.
+    void InvalidateMapped(BufferHandle buffer, uint64_t offset, uint64_t size);
     [[nodiscard]] TextureDescription GetTextureDescription(TextureHandle texture) const;
 
     void Destroy(BufferHandle h);

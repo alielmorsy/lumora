@@ -532,6 +532,28 @@ void CommandBuffer::DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uin
                      firstInstance);
 }
 
+namespace {
+std::vector<VkBufferImageCopy> ToVkRegions(std::span<const BufferImageCopy> regions, VkImageAspectFlags aspect)
+{
+    std::vector<VkBufferImageCopy> out;
+    out.reserve(regions.size());
+    for (const auto& r : regions) {
+        VkBufferImageCopy bic{};
+        bic.bufferOffset                    = r.bufferOffset;
+        bic.bufferRowLength                 = r.bufferRowLength;
+        bic.bufferImageHeight               = r.bufferImageHeight;
+        bic.imageSubresource.aspectMask     = aspect;
+        bic.imageSubresource.mipLevel       = r.mipLevel;
+        bic.imageSubresource.baseArrayLayer = r.baseArrayLayer;
+        bic.imageSubresource.layerCount     = r.layerCount;
+        bic.imageOffset                     = {r.imageOffset.x, r.imageOffset.y, r.imageOffset.z};
+        bic.imageExtent                     = {r.imageExtent.width, r.imageExtent.height, r.imageExtent.depth};
+        out.push_back(bic);
+    }
+    return out;
+}
+} // namespace
+
 void CommandBuffer::CopyBufferToImage(BufferHandle src, TextureHandle dst, ImageLayout dstLayout,
                                       std::span<const BufferImageCopy> regions)
 {
@@ -548,26 +570,43 @@ void CommandBuffer::CopyBufferToImage(BufferHandle src, TextureHandle dst, Image
         return;
     }
 
-    std::vector<VkBufferImageCopy> vkRegions;
-    vkRegions.reserve(regions.size());
-    const VkImageAspectFlags aspect = detail::AspectOf(t->desc.format);
-
-    for (const auto& r : regions) {
-        VkBufferImageCopy bic{};
-        bic.bufferOffset                    = r.bufferOffset;
-        bic.bufferRowLength                 = r.bufferRowLength;
-        bic.bufferImageHeight               = r.bufferImageHeight;
-        bic.imageSubresource.aspectMask     = aspect;
-        bic.imageSubresource.mipLevel       = r.mipLevel;
-        bic.imageSubresource.baseArrayLayer = r.baseArrayLayer;
-        bic.imageSubresource.layerCount     = r.layerCount;
-        bic.imageOffset                     = {r.imageOffset.x, r.imageOffset.y, r.imageOffset.z};
-        bic.imageExtent                     = {r.imageExtent.width, r.imageExtent.height, r.imageExtent.depth};
-        vkRegions.push_back(bic);
-    }
+    const std::vector<VkBufferImageCopy> vkRegions = ToVkRegions(regions, detail::AspectOf(t->desc.format));
 
     vkCmdCopyBufferToImage(static_cast<VkCommandBuffer>(_cmd), b->buffer, t->image, detail::ToVk(dstLayout),
                            static_cast<uint32_t>(vkRegions.size()), vkRegions.data());
+}
+
+void CommandBuffer::CopyImageToBuffer(TextureHandle src, ImageLayout srcLayout, BufferHandle dst,
+                                      std::span<const BufferImageCopy> regions)
+{
+    if (!_rhi || !_cmd || regions.empty())
+        return;
+    detail::Texture* t = _rhi->textures.Get(src);
+    if (!t) {
+        LOG_INVALID_HANDLE_ONCE("texture", src);
+        return;
+    }
+    detail::Buffer* b = _rhi->buffers.Get(dst);
+    if (!b) {
+        LOG_INVALID_HANDLE_ONCE("buffer", dst);
+        return;
+    }
+
+    const std::vector<VkBufferImageCopy> vkRegions = ToVkRegions(regions, detail::AspectOf(t->desc.format));
+
+    vkCmdCopyImageToBuffer(static_cast<VkCommandBuffer>(_cmd), t->image, detail::ToVk(srcLayout), b->buffer,
+                           static_cast<uint32_t>(vkRegions.size()), vkRegions.data());
+
+    // Make the copy visible to host reads after the fence wait (pair with RHIResources::InvalidateMapped).
+    VkBufferMemoryBarrier mb{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
+    mb.srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT;
+    mb.dstAccessMask       = VK_ACCESS_HOST_READ_BIT;
+    mb.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    mb.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    mb.buffer              = b->buffer;
+    mb.size                = VK_WHOLE_SIZE;
+    vkCmdPipelineBarrier(static_cast<VkCommandBuffer>(_cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0,
+                         0, nullptr, 1, &mb, 0, nullptr);
 }
 
 void CommandBuffer::BeginDebugLabel(std::string_view name, Color color)

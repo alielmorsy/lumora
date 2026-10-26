@@ -1,5 +1,6 @@
 #include "Svg/SvgRenderer.h"
 
+#include "Paint/CanvasStroke.h"
 #include "Svg/SvgTessellate.h"
 
 #include <lumora/Paint/Canvas.h>
@@ -9,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <span>
 #include <vector>
 
 namespace lumora::svg
@@ -355,10 +357,7 @@ namespace lumora::svg
 
                 if (op.paint.kind == PaintKind::Gradient)
                 {
-                    const float       maxEdgeDoc = kGradMaxEdgePx / std::max(deviceScale, 0.01f);
-                    std::vector<Vec2> sub;
-                    SubdivideTris(tris, maxEdgeDoc, sub);
-                    tris.swap(sub);
+                    SubdivideFill(tris, boundary, kGradMaxEdgePx / std::max(deviceScale, 0.01f));
                 }
 
                 const auto sample = [&](Vec2 docp) {
@@ -469,7 +468,26 @@ namespace lumora::svg
             }
         }
 
-        void EmitDashed(Paint2D& surface, const std::vector<Vec2>& pts, bool closed, Color col, float width,
+        struct StrokeSink
+        {
+            Canvas& canvas;
+            std::vector<PaintVertex> scratch;
+
+            void DrawPolyline(std::span<const Vec2> pts, Color col, float width, bool closed, LineJoin join, LineCap cap)
+            {
+                DrawPolylineOnCanvas(canvas, scratch, pts, col, width, closed, join, cap);
+            }
+        };
+
+        void FillVertices(Canvas& canvas, std::span<const PaintVertex> verts)
+        {
+            if (verts.size() >= 3)
+            {
+                canvas.DrawTriangles(verts);
+            }
+        }
+
+        void EmitDashed(StrokeSink& sink, const std::vector<Vec2>& pts, bool closed, Color col, float width,
                         LineCap cap, const std::vector<float>& dash, float offset)
         {
             std::vector<float> pat = dash;
@@ -481,7 +499,7 @@ namespace lumora::svg
             for (const float d : pat) total += std::max(0.f, d);
             if (pat.empty() || total <= 1e-3f)
             {
-                surface.DrawPolyline(pts, col, width, closed, LineJoin::Round, cap);
+                sink.DrawPolyline(pts, col, width, closed, LineJoin::Round, cap);
                 return;
             }
 
@@ -516,7 +534,7 @@ namespace lumora::svg
             const auto flush = [&]() {
                 if (on && run.size() >= 2)
                 {
-                    surface.DrawPolyline(run, col, width, false, LineJoin::Round, cap);
+                    sink.DrawPolyline(run, col, width, false, LineJoin::Round, cap);
                 }
                 run.clear();
             };
@@ -545,7 +563,7 @@ namespace lumora::svg
             flush();
         }
 
-        void EmitStroke(Paint2D& surface, const DrawOp& op, const OpGeometry& geo, const Builder& fitter)
+        void EmitStroke(StrokeSink& sink, const DrawOp& op, const OpGeometry& geo, const Builder& fitter)
         {
             const float scaleAvg = (fitter.sx + fitter.sy) * 0.5f;
             const float width = op.stroke.width * scaleAvg;
@@ -571,18 +589,18 @@ namespace lumora::svg
                 }
                 if (dashS.empty())
                 {
-                    surface.DrawPolyline(c.pts, geo.strokeColor, width, c.closed, join, cap);
+                    sink.DrawPolyline(c.pts, geo.strokeColor, width, c.closed, join, cap);
                 }
                 else
                 {
-                    EmitDashed(surface, c.pts, c.closed, geo.strokeColor, width, cap, dashS,
+                    EmitDashed(sink, c.pts, c.closed, geo.strokeColor, width, cap, dashS,
                                op.stroke.dashOffset * scaleAvg);
                 }
             }
         }
     } // namespace
 
-    void RenderScene(Paint2D& surface, Canvas& canvas, SvgScene& scene, SceneCache& cache, const Rect& box,
+    void RenderScene(Canvas& canvas, SvgScene& scene, SceneCache& cache, const Rect& box,
                      SvgAlign align, SvgMeetOrSlice meetOrSlice, float widgetOpacity, float contentScale)
     {
         if (!scene.valid || box.width <= 0.f || box.height <= 0.f)
@@ -600,6 +618,7 @@ namespace lumora::svg
         }
 
         Builder fitter{scene, cache, scene.viewBoxMin, fit.sx, fit.sy, deviceScale, cs};
+        StrokeSink sink{canvas, {}};
 
         const float layerOpacity = std::clamp(widgetOpacity * scene.docOpacity, 0.f, 1.f);
         const float trans[9] = {1.f, 0.f, 0.f, 0.f, 1.f, 0.f, fit.tx, fit.ty, 1.f};
@@ -618,23 +637,23 @@ namespace lumora::svg
                     // Translucent fill: clip a flat colour quad to the shape's AA coverage mask.
                     canvas.PushClipMask(g.maskCoverage, {g.bboxMin.x, g.bboxMin.y,
                                                          g.bboxMax.x - g.bboxMin.x, g.bboxMax.y - g.bboxMin.y});
-                    surface.FillVertices(g.fillVerts);
+                    FillVertices(canvas, g.fillVerts);
                     canvas.PopClip();
                 }
                 else
                 {
-                    surface.FillVertices(g.fillVerts);
+                    FillVertices(canvas, g.fillVerts);
                 }
                 break;
             }
             case OpType::Stroke:
-                EmitStroke(surface, op, cache.ops[i], fitter);
+                EmitStroke(sink, op, cache.ops[i], fitter);
                 break;
             case OpType::PushGroupOpacity:
-                surface.PushOpacityLayer(op.groupOpacity);
+                canvas.PushLayer(op.groupOpacity, nullptr);
                 break;
             case OpType::PopGroupOpacity:
-                surface.PopLayer();
+                canvas.PopLayer();
                 break;
             case OpType::PushClip:
             {

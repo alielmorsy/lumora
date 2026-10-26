@@ -65,16 +65,35 @@ namespace lumora
         return Valid() ? m_data->scene.intrinsic : Vec2{};
     }
 
+    Rect SvgImage::ViewBox() const noexcept
+    {
+        if (!Valid())
+        {
+            return {};
+        }
+        const svg::SvgScene& sc = m_data->scene;
+        if (sc.viewBoxSize.x > 0.f && sc.viewBoxSize.y > 0.f)
+        {
+            return {sc.viewBoxMin.x, sc.viewBoxMin.y, sc.viewBoxSize.x, sc.viewBoxSize.y};
+        }
+        return {0.f, 0.f, sc.intrinsic.x, sc.intrinsic.y};
+    }
+
     void SvgImage::Draw(Paint2D& surface, const Rect& box, float opacity, SvgAlign align,
+                        SvgMeetOrSlice meetOrSlice) const
+    {
+        Draw(surface.m_canvas, box, opacity, surface.m_ctx.contentScale, align, meetOrSlice);
+    }
+
+    void SvgImage::Draw(Canvas& canvas, const Rect& box, float opacity, float contentScale, SvgAlign align,
                         SvgMeetOrSlice meetOrSlice) const
     {
         if (!Valid() || box.width <= 0.f || box.height <= 0.f)
         {
             return;
         }
-        surface.PushClip(box);
-        svg::RenderScene(surface, surface.m_canvas, m_data->scene, m_data->cache, box, align, meetOrSlice,
-                         opacity, surface.m_ctx.contentScale);
-        surface.PopClip();
+        canvas.PushClip(box);
+        svg::RenderScene(canvas, m_data->scene, m_data->cache, box, align, meetOrSlice, opacity, contentScale);
+        canvas.PopClip();
     }
 } // namespace lumora

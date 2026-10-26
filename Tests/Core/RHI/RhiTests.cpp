@@ -324,3 +324,59 @@ TEST_F(RhiTest, DeferredDestroyAcrossFramesNoSwapchain)
 
     rhi.Shutdown();
 }
+
+TEST_F(RhiTest, CopyImageToBufferReadsBackClear)
+{
+    using namespace lumora::rhi;
+    RHI rhi;
+    RHIInitDescription init{};
+    init.enableValidation = true;
+    rhi.Init(init);
+
+    TextureDescription td{};
+    td.type   = TextureType::e2D;
+    td.extent = {4, 4, 1};
+    td.format = Format::R8G8B8A8_Unorm;
+    td.usage  = TextureUsage::ColorAttachment | TextureUsage::TransferSrc;
+    auto tex  = rhi.Resources().CreateTexture(td);
+    ASSERT_TRUE(tex.IsValid());
+
+    BufferDescription bd{};
+    bd.size   = 64;
+    bd.usage  = BufferUsage::TransferDst;
+    bd.memory = MemoryPattern::GpuToCpu;
+    auto buf  = rhi.Resources().CreateBuffer(bd);
+    ASSERT_TRUE(buf.IsValid());
+
+    rhi.ImmediateSubmit([&](CommandBuffer& cmd) {
+        cmd.TransitionTexture(tex, ImageLayout::Undefined, ImageLayout::ColorAttachment);
+        ColorAttachment att{};
+        att.texture    = tex;
+        att.loadOp     = LoadOp::Clear;
+        att.clearColor = {1.0f, 0.5f, 0.0f, 1.0f};
+        RenderingInfo info{};
+        info.renderArea        = {{0, 0}, {4, 4}};
+        info.colorAttachments  = std::span(&att, 1);
+        cmd.BeginRendering(info);
+        cmd.EndRendering();
+        cmd.TransitionTexture(tex, ImageLayout::ColorAttachment, ImageLayout::TransferSrc);
+        BufferImageCopy region{};
+        region.imageExtent = {4, 4, 1};
+        cmd.CopyImageToBuffer(tex, ImageLayout::TransferSrc, buf, std::span(&region, 1));
+    });
+    rhi.WaitIdle();
+    rhi.Resources().InvalidateMapped(buf, 0, 64);
+
+    const auto* px = static_cast<const uint8_t*>(rhi.Resources().GetMappedPointer(buf));
+    ASSERT_NE(px, nullptr);
+    for (int i = 0; i < 16; ++i) {
+        EXPECT_EQ(px[i * 4 + 0], 255);
+        EXPECT_NEAR(px[i * 4 + 1], 128, 1);
+        EXPECT_EQ(px[i * 4 + 2], 0);
+        EXPECT_EQ(px[i * 4 + 3], 255);
+    }
+
+    rhi.Resources().Destroy(buf);
+    rhi.Resources().Destroy(tex);
+    rhi.Shutdown();
+}

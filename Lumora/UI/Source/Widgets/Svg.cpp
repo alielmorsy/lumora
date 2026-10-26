@@ -15,7 +15,6 @@
 
 #include <lumora/AssetLoader.h>
 #include <lumora/Paint/Canvas.h>
-#include <lumora/Paint/Paint2D.h>
 
 #include <string>
 #include <utility>
@@ -93,10 +92,8 @@ namespace lumora
                                    n.solved.width - pad.left - pad.right,
                                    n.solved.height - pad.top - pad.bottom};
                 canvas.PushClip(content);
-                Paint2D surface(ctx, canvas, content, ctx.pointerPos);
-                svg::RenderScene(surface, canvas, p.scene, p.cache, content, p.align, p.meetOrSlice, p.opacity,
+                svg::RenderScene(canvas, p.scene, p.cache, content, p.align, p.meetOrSlice, p.opacity,
                                  ctx.contentScale);
-                surface.Unwind();
                 canvas.PopClip();
             }
 

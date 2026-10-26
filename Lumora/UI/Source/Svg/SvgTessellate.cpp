@@ -14,7 +14,8 @@ namespace lumora::svg
     namespace
     {
         constexpr int kMaxFlattenDepth = 16;
-        constexpr int kMaxSubdivDepth = 7;
+        constexpr int kMaxSubdivDepth = 48;    ///< float-degeneracy guard only; kMaxEdgeSplits ends recursion first
+        constexpr float kMaxEdgeSplits = 32.f; ///< caps the mesh at high zoom: no edge splits finer than longest / this
 
         [[nodiscard]] float Cross(Vec2 a, Vec2 b) noexcept { return a.x * b.y - a.y * b.x; }
         [[nodiscard]] Vec2 Lerp(Vec2 a, Vec2 b, float t) noexcept { return a + (b - a) * t; }
@@ -46,6 +47,11 @@ namespace lumora::svg
             FlattenCubicTo(out, m, p123, p23, p3, tol, depth + 1);
         }
 
+        // Bisection ends only when every edge is short, and an edge's midpoint is symmetric in its endpoints, so both triangles
+        // sharing an edge split it into the same pieces, bit for bit. Lerp(a, b, .5) and a depth cap left T-junctions that
+        // rasterized as pinhole cracks.
+        [[nodiscard]] Vec2 Mid(Vec2 a, Vec2 b) noexcept { return (a + b) * .5f; }
+
         void SplitTri(Vec2 a, Vec2 b, Vec2 c, float maxEdge2, int depth, std::vector<Vec2>& out)
         {
             const float ab = (b - a).LengthSquared();
@@ -61,22 +67,35 @@ namespace lumora::svg
             }
             if (ab >= bc && ab >= ca)
             {
-                const Vec2 m = Lerp(a, b, .5f);
+                const Vec2 m = Mid(a, b);
                 SplitTri(a, m, c, maxEdge2, depth + 1, out);
                 SplitTri(m, b, c, maxEdge2, depth + 1, out);
             }
             else if (bc >= ab && bc >= ca)
             {
-                const Vec2 m = Lerp(b, c, .5f);
+                const Vec2 m = Mid(b, c);
                 SplitTri(a, b, m, maxEdge2, depth + 1, out);
                 SplitTri(a, m, c, maxEdge2, depth + 1, out);
             }
             else
             {
-                const Vec2 m = Lerp(c, a, .5f);
+                const Vec2 m = Mid(c, a);
                 SplitTri(a, b, m, maxEdge2, depth + 1, out);
                 SplitTri(m, b, c, maxEdge2, depth + 1, out);
             }
+        }
+
+        // Appends the points SplitTri puts strictly inside edge ab, in order from a.
+        void SplitEdge(Vec2 a, Vec2 b, float maxEdge2, int depth, std::vector<Vec2>& out)
+        {
+            if (depth >= kMaxSubdivDepth || (b - a).LengthSquared() <= maxEdge2)
+            {
+                return;
+            }
+            const Vec2 m = Mid(a, b);
+            SplitEdge(a, m, maxEdge2, depth + 1, out);
+            out.push_back(m);
+            SplitEdge(m, b, maxEdge2, depth + 1, out);
         }
     } // namespace
 
@@ -259,22 +278,40 @@ namespace lumora::svg
         tessDeleteTess(tess);
     }
 
-    void SubdivideTris(const std::vector<Vec2>& in, float maxEdge, std::vector<Vec2>& out)
+    void SubdivideFill(std::vector<Vec2>& tris, std::vector<FlatContour>& boundary, float maxEdge)
     {
-        const float maxEdge2 = maxEdge > 0.f ? maxEdge * maxEdge : 0.f;
-        out.reserve(in.size());
-        for (std::size_t i = 0; i + 2 < in.size(); i += 3)
+        float longest2 = 0.f;
+        for (std::size_t i = 0; i + 2 < tris.size(); i += 3)
         {
-            if (maxEdge2 <= 0.f)
+            longest2 = std::max({longest2, (tris[i + 1] - tris[i]).LengthSquared(), (tris[i + 2] - tris[i + 1]).LengthSquared(),
+                                 (tris[i] - tris[i + 2]).LengthSquared()});
+        }
+        maxEdge = std::max(maxEdge, std::sqrt(longest2) / kMaxEdgeSplits);
+        if (maxEdge <= 0.f)
+        {
+            return;
+        }
+        const float maxEdge2 = maxEdge * maxEdge;
+
+        std::vector<Vec2> out;
+        out.reserve(tris.size());
+        for (std::size_t i = 0; i + 2 < tris.size(); i += 3)
+        {
+            SplitTri(tris[i], tris[i + 1], tris[i + 2], maxEdge2, 0, out);
+        }
+        tris.swap(out);
+
+        // The feather ribbon's inner edge must match the split boundary edges too.
+        for (FlatContour& loop : boundary)
+        {
+            std::vector<Vec2> pts;
+            pts.reserve(loop.pts.size());
+            for (std::size_t k = 0; k < loop.pts.size(); ++k)
             {
-                out.push_back(in[i]);
-                out.push_back(in[i + 1]);
-                out.push_back(in[i + 2]);
+                pts.push_back(loop.pts[k]);
+                SplitEdge(loop.pts[k], loop.pts[(k + 1) % loop.pts.size()], maxEdge2, 0, pts);
             }
-            else
-            {
-                SplitTri(in[i], in[i + 1], in[i + 2], maxEdge2, 0, out);
-            }
+            loop.pts.swap(pts);
         }
     }
 } // namespace lumora::svg
