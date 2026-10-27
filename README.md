@@ -34,6 +34,10 @@ cmake --build --preset release
 
 On Windows, `scripts\build.cmd` and `scripts\release.cmd` set up the MSVC environment first before building. Build output is placed in `build/<preset>`.
 
+### Linux (X11 and Wayland)
+
+The desktop Linux platform layer ships both window backends and picks one at runtime: Wayland when `WAYLAND_DISPLAY` answers, otherwise X11. Set `LUMORA_WINDOW_BACKEND=x11` or `wayland` to force one. Build dependencies (Debian/Ubuntu names): `libx11-dev libx11-xcb-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev libxi-dev libxcursor-dev libxfixes-dev libxrandr-dev libwayland-dev libvulkan-dev`, plus `libdecor-0-dev` for client-side window decorations on GNOME. `zenity` (or `kdialog`) provides the file dialogs and boot progress window. Without the X11/Wayland packages the build stays headless.
+
 ### Headless Linux Presets
 
 `CMakePresets.json` defines headless configurations where GPU rendering and samples are disabled (`LUMORA_BUILD_GPU=OFF`, `LUMORA_BUILD_SAMPLES=OFF`):

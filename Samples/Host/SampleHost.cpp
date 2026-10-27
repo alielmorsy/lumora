@@ -102,6 +102,10 @@ rhi::NativeWindowHandles ToRhiHandles(const platform::NativeWindowHandle& h)
         kind = rhi::NativeWindowKind::Android;
     else if (h.backend == platform::WindowBackend::Web)
         kind = rhi::NativeWindowKind::Web;
+    else if (h.backend == platform::WindowBackend::Xlib)
+        kind = rhi::NativeWindowKind::Xlib;
+    else if (h.backend == platform::WindowBackend::Wayland)
+        kind = rhi::NativeWindowKind::Wayland;
     return {.window = h.window, .instance = h.instance, .kind = kind};
 }
 

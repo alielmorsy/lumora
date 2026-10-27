@@ -183,6 +183,11 @@ VkInstance CreateInstance(uint32_t apiVersion, bool validation, bool& debugUtils
     exts.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 #elif defined(__ANDROID__)
     exts.push_back(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME);
+#elif defined(__linux__)
+    // The window backend is picked at runtime, so enable every surface extension the loader offers.
+    for (const char* surfaceExt : {VK_KHR_XLIB_SURFACE_EXTENSION_NAME, VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME})
+        if (HasExtension(available, surfaceExt))
+            exts.push_back(surfaceExt);
 #endif
     debugUtils = HasExtension(available, VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     if (debugUtils)
