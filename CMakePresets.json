@@ -60,6 +60,24 @@
       }
     },
     {
+      "name": "linux",
+      "displayName": "Linux desktop (X11 + Wayland, GPU + samples)",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "LUMORA_BUILD_GPU": "ON",
+        "LUMORA_BUILD_SAMPLES": "ON",
+        "LUMORA_BUILD_SCRIPT": "OFF",
+        "LUMORA_BUILD_TESTS": "OFF",
+        "LUMORA_BUILD_BENCHMARKS": "OFF"
+      }
+    },
+    {
       "name": "web",
       "displayName": "Web (Emscripten + WebGPU)",
       "inherits": "base",
@@ -87,6 +105,10 @@
     {
       "name": "linux-asan",
       "configurePreset": "linux-asan"
+    },
+    {
+      "name": "linux",
+      "configurePreset": "linux"
     },
     {
       "name": "web",

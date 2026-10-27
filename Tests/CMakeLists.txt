@@ -21,7 +21,7 @@ function(lumora_add_test name)
     endif ()
 endfunction()
 
-if (WIN32)
+if (WIN32 OR LUMORA_PLATFORM_LINUX_DESKTOP)
     add_subdirectory(Core/Platform)
 endif ()
 if (LUMORA_BUILD_GPU)

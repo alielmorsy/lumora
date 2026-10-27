@@ -253,9 +253,10 @@ struct BufferBarrier {
 
 // ---- Swapchain ----
 
-enum class NativeWindowKind : uint8_t { Win32, Android, Web };
+enum class NativeWindowKind : uint8_t { Win32, Android, Web, Xlib, Wayland };
 
 // Win32: window = HWND, instance = HINSTANCE. Android: window = ANativeWindow*. Web: window = const char* canvas CSS selector.
+// Xlib: window = X11 Window id (as a pointer-sized integer), instance = Display*. Wayland: window = wl_surface*, instance = wl_display*.
 struct NativeWindowHandles {
     void*            window   = nullptr;
     void*            instance = nullptr;

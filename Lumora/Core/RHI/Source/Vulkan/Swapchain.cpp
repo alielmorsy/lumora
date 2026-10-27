@@ -39,6 +39,21 @@ VkSurfaceKHR CreateSurface(VkInstance instance, const NativeWindowHandles& handl
         LUMORA_VK_CHECK(vkCreateAndroidSurfaceKHR(instance, &sci, nullptr, &surface));
         return surface;
     }
+#elif defined(__linux__)
+    if (handles.kind == NativeWindowKind::Xlib) {
+        VkXlibSurfaceCreateInfoKHR sci{VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR};
+        sci.dpy    = static_cast<Display*>(handles.instance);
+        sci.window = reinterpret_cast<Window>(handles.window);
+        LUMORA_VK_CHECK(vkCreateXlibSurfaceKHR(instance, &sci, nullptr, &surface));
+        return surface;
+    }
+    else if (handles.kind == NativeWindowKind::Wayland) {
+        VkWaylandSurfaceCreateInfoKHR sci{VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR};
+        sci.display = static_cast<wl_display*>(handles.instance);
+        sci.surface = static_cast<wl_surface*>(handles.window);
+        LUMORA_VK_CHECK(vkCreateWaylandSurfaceKHR(instance, &sci, nullptr, &surface));
+        return surface;
+    }
 #endif
     LOG_ERROR("Unsupported native window kind or platform");
     return VK_NULL_HANDLE;

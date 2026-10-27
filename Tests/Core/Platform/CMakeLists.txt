@@ -1,8 +1,13 @@
-add_executable(lumora_platform_tests
-    WindowGeometryTests.cpp
-    DirectoryWatcherTests.cpp
-    ThreadTests.cpp
-)
+add_executable(lumora_platform_tests ThreadTests.cpp)
+if (WIN32)
+    target_sources(lumora_platform_tests PRIVATE WindowGeometryTests.cpp DirectoryWatcherTests.cpp)
+else ()
+    target_sources(lumora_platform_tests PRIVATE LinuxPlatformTests.cpp)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(_xkb REQUIRED IMPORTED_TARGET xkbcommon)
+    target_include_directories(lumora_platform_tests PRIVATE ${LUMORA_ROOT_DIR}/Lumora/Core/Platform/Source)
+    target_link_libraries(lumora_platform_tests PRIVATE PkgConfig::_xkb)
+endif ()
 
 lumora_defaults(lumora_platform_tests)
 target_link_libraries(lumora_platform_tests PRIVATE lumora::platform lumora::log GTest::gtest GTest::gtest_main)
